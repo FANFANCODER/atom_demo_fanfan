@@ -6,8 +6,22 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-DB_PATH = os.environ.get("ATOM_DB_PATH", os.path.join(os.path.dirname(__file__), "atom.db"))
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+# Database URL: Postgres on Vercel, SQLite locally.
+# Vercel Postgres provides POSTGRES_URL; you can also set DATABASE_URL directly.
+DB_URL = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+if not DB_URL:
+    DB_PATH = os.environ.get("ATOM_DB_PATH", os.path.join(os.path.dirname(__file__), "atom.db"))
+    DB_URL = f"sqlite:///{DB_PATH}"
+
+# Vercel Postgres URLs may start with postgres://; SQLAlchemy 2.x wants postgresql://
+if DB_URL.startswith("postgres://"):
+    DB_URL = "postgresql://" + DB_URL[len("postgres://"):]
+
+_connect_args = {}
+if DB_URL.startswith("sqlite"):
+    _connect_args = {"check_same_thread": False}
+
+engine = create_engine(DB_URL, connect_args=_connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

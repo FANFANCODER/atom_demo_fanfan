@@ -12,7 +12,13 @@ backend/storage/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+public/
 *.log
+
+# Test artifacts
+e2e.txt
+pub.txt
+cookie.txt
 
 # Env
 .env
