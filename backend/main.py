@@ -29,7 +29,6 @@ app.include_router(auth_routes.router)
 app.include_router(project_routes.router)
 
 BASE_DIR = Path(__file__).resolve().parent
-FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 
 
 @app.on_event("startup")
@@ -94,7 +93,10 @@ def _content_type(path: str) -> str:
 
 
 # ---------- Frontend SPA fallback ----------
-if FRONTEND_DIST.exists():
+# On Vercel, static files are served by Vercel CDN; only /api/* and /sites/*
+# reach this FastAPI app. The SPA fallback only matters for local dev.
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists() and FRONTEND_DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 
     @app.get("/{full_path:path}")
