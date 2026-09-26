@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+backend/atom.db
+backend/storage/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.log
+
+# Env
+.env
+.env.*
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Trae
+.trae-html-share-packages/
+.trae/
