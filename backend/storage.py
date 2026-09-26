@@ -18,13 +18,19 @@ from pathlib import Path
 BLOB_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN", "")
 USE_BLOB = bool(BLOB_TOKEN)
 
-STORAGE_ROOT = os.environ.get("ATOM_STORAGE_ROOT", os.path.join(os.path.dirname(__file__), "storage"))
+# Local storage root. On Vercel Serverless the filesystem is read-only except
+# /tmp, so when using Blob we don't need local dirs at all.
+STORAGE_ROOT = os.environ.get(
+    "ATOM_STORAGE_ROOT",
+    "/tmp/atom-storage" if USE_BLOB else os.path.join(os.path.dirname(__file__), "storage"),
+)
 SNAPSHOTS_DIR = os.path.join(STORAGE_ROOT, "snapshots")
 SITES_DIR = os.path.join(STORAGE_ROOT, "sites")
 LOGS_DIR = os.path.join(STORAGE_ROOT, "logs")
 
-for d in (SNAPSHOTS_DIR, SITES_DIR, LOGS_DIR):
-    os.makedirs(d, exist_ok=True)
+if not USE_BLOB:
+    for d in (SNAPSHOTS_DIR, SITES_DIR, LOGS_DIR):
+        os.makedirs(d, exist_ok=True)
 
 
 # ---------- helpers ----------

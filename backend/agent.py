@@ -37,7 +37,7 @@ async def generate_with_llm(prompt: str) -> dict:
     if not LLM_API_KEY:
         return None
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             r = await client.post(
                 f"{LLM_BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {LLM_API_KEY}"},
