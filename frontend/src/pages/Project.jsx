@@ -110,7 +110,10 @@ export default function Project() {
     navigate('/dashboard')
   }
 
-  const previewUrl = project?.public_url
+  const rawUrl = project?.public_url
+  const previewUrl = rawUrl
+    ? (rawUrl.startsWith('http') ? rawUrl : `${window.location.origin}${rawUrl}`)
+    : null
 
   return (
     <div className="container" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>

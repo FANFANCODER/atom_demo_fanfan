@@ -20,7 +20,17 @@ from agent import generate_site
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
-PUBLIC_BASE_URL = os.environ.get("ATOM_PUBLIC_URL", "http://localhost:8000")
+PUBLIC_BASE_URL = os.environ.get("ATOM_PUBLIC_URL", "")
+
+
+def get_base_url(request: Request) -> str:
+    """Derive the public base URL from the request, honoring proxy headers.
+    If ATOM_PUBLIC_URL is set, use it. Otherwise return '' so the stored URL
+    is a relative path (the frontend prepends window.location.origin)."""
+    if PUBLIC_BASE_URL:
+        return PUBLIC_BASE_URL.rstrip("/")
+    # No fixed public URL: store relative path, frontend resolves against origin.
+    return ""
 
 
 def _new_slug(db: Session, name: str) -> str:
@@ -165,7 +175,8 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
 
             # store the built site
             artifact_key = storage.put_site(p.id, dep.id, files)
-            url = f"{PUBLIC_BASE_URL}/sites/{p.slug}/index.html"
+            base_url = get_base_url(request)
+            url = f"{base_url}/sites/{p.slug}/index.html"
             dep.status = "LIVE"
             dep.artifact_key = artifact_key
             dep.url = url
@@ -256,7 +267,7 @@ def list_snapshots(project_id: str, user: User = Depends(get_current_user), db: 
 
 
 @router.post("/{project_id}/redeploy")
-def redeploy(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def redeploy(project_id: str, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = _own_project(db, user, project_id)
     snap = db.query(FileSnapshot).filter(FileSnapshot.project_id == p.id, FileSnapshot.is_latest == True).first()
     if not snap:
@@ -266,7 +277,8 @@ def redeploy(project_id: str, user: User = Depends(get_current_user), db: Sessio
     db.add(dep)
     db.commit()
     key = storage.put_site(p.id, dep.id, files)
-    url = f"{PUBLIC_BASE_URL}/sites/{p.slug}/index.html"
+    base_url = get_base_url(request)
+    url = f"{base_url}/sites/{p.slug}/index.html"
     dep.artifact_key = key
     dep.url = url
     p.public_url = url
