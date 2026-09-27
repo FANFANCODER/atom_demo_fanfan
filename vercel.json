@@ -9,7 +9,6 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/fastapi/api/$1" },
-    { "source": "/sites/(.*)", "destination": "/fastapi/sites/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/sites/(.*)", "destination": "/fastapi/sites/$1" }
   ]
 }
