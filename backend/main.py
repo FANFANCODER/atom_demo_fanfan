@@ -46,8 +46,7 @@ def health():
 
 
 # ---------- Deployed static sites ----------
-@app.get("/sites/{slug}/{path:path}")
-def serve_site(slug: str, path: str):
+def _serve_site_file(slug: str, path: str):
     db = SessionLocal()
     try:
         p = db.query(Project).filter(Project.slug == slug).first()
@@ -72,9 +71,25 @@ def serve_site(slug: str, path: str):
         db.close()
 
 
+@app.get("/sites/{slug}/{path:path}")
+def serve_site(slug: str, path: str):
+    return _serve_site_file(slug, path)
+
+
 @app.get("/sites/{slug}")
 def serve_site_root(slug: str):
     return RedirectResponse(url=f"/sites/{slug}/index.html")
+
+
+# Vercel: /sites/* is rewritten to /api/sites/* so it reaches the serverless fn
+@app.get("/api/sites/{slug}/{path:path}")
+def serve_site_via_api(slug: str, path: str):
+    return _serve_site_file(slug, path)
+
+
+@app.get("/api/sites/{slug}")
+def serve_site_root_via_api(slug: str):
+    return RedirectResponse(url=f"/api/sites/{slug}/index.html")
 
 
 def _content_type(path: str) -> str:
