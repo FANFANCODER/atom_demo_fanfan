@@ -132,6 +132,26 @@ textarea.input { resize: vertical; }
 }
 
 /* ---------- Dashboard ---------- */
+.dash-hero {
+  text-align: center; padding: 56px 24px 32px;
+}
+.hero-title {
+  font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.03em;
+  margin-bottom: 12px; background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero-sub { color: var(--text-secondary); font-size: 15px; margin-bottom: 28px; }
+.dash-chat-form {
+  display: flex; gap: 10px; max-width: 640px; margin: 0 auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 10px; box-shadow: var(--shadow-sm);
+}
+.dash-chat-input {
+  flex: 1; border: none; background: transparent; resize: none;
+  font-size: 14px; line-height: 1.5; padding: 8px 10px; outline: none;
+  font-family: inherit;
+}
+.dash-chat-btn { align-self: center; white-space: nowrap; }
 .dash-header {
   display: flex; align-items: center; justify-content: space-between;
   margin: 32px 0 24px;
@@ -240,4 +260,7 @@ textarea.input { resize: vertical; }
   .container { padding: 0 16px; }
   .auth-card { padding: 32px 24px; }
   .dash-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .dash-hero { padding: 32px 8px 24px; }
+  .dash-chat-form { flex-direction: column; }
+  .dash-chat-btn { width: 100%; }
 }

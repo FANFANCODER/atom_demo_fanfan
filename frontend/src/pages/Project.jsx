@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { apiJson, api } from '../api'
 
 export default function Project() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [project, setProject] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -12,6 +13,7 @@ export default function Project() {
   const [user, setUser] = useState(null)
   const scrollRef = useRef(null)
   const abortRef = useRef(null)
+  const initialSentRef = useRef(false)
 
   useEffect(() => {
     apiJson('/api/auth/me').then(setUser).catch(() => {})
@@ -24,6 +26,14 @@ export default function Project() {
       setProject(p)
       const msgs = await apiJson(`/api/projects/${id}/messages`)
       setMessages(msgs)
+      // auto-send initial message from dashboard if present and no messages yet
+      const initialMsg = searchParams.get('msg')
+      if (initialMsg && !msgs.length && !initialSentRef.current) {
+        initialSentRef.current = true
+        setInput(initialMsg)
+        // send after a short delay so UI settles
+        setTimeout(() => sendWithContent(initialMsg), 300)
+      }
     } catch (e) {}
   }
 
@@ -36,6 +46,11 @@ export default function Project() {
     const content = input.trim()
     if (!content || sending) return
     setInput('')
+    await sendWithContent(content)
+  }
+
+  async function sendWithContent(content) {
+    if (!content || sending) return
     setSending(true)
     const userMsg = { id: Date.now(), role: 'user', content }
     setMessages(m => [...m, userMsg])
@@ -49,8 +64,6 @@ export default function Project() {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let assistantText = ''
-      let lastStatus = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -65,7 +78,6 @@ export default function Project() {
           const evt = evtMatch[1]
           const data = dataMatch[1]
           if (evt === 'status') {
-            lastStatus = data
             setMessages(m => {
               const copy = [...m]
               const last = copy[copy.length - 1]
@@ -77,11 +89,12 @@ export default function Project() {
               return copy
             })
           } else if (evt === 'assistant') {
-            assistantText = data
             setMessages(m => [...m.filter(x => !x._status), { id: 'a' + Date.now(), role: 'assistant', content: data }])
           } else if (evt === 'deployment') {
             const dep = JSON.parse(data)
             setProject(p => p ? { ...p, public_url: dep.url, status: dep.status } : p)
+          } else if (evt === 'error') {
+            setMessages(m => [...m.filter(x => !x._status), { id: 'e' + Date.now(), role: 'assistant', content: '生成失败：' + data }])
           }
         }
       }

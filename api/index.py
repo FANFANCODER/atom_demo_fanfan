@@ -39,14 +39,17 @@ finally:
     except Exception:
         pass
 
-# Import the FastAPI app. Vercel detects the `app` variable as the ASGI
-# entrypoint.
-from main import app  # noqa: E402
+# Import the FastAPI app.
+# Vercel's native ASGI runtime has a known issue where request bodies are not
+# passed to the ASGI app (resulting in 422 "Field required" / body=null).
+# Wrapping the app with Mangum converts it to a WSGI callable; Vercel then
+# uses its WSGI handler which correctly forwards the request body.
+from main import app as _asgi_app  # noqa: E402
 
-# Also expose a Mangum WSGI handler as a fallback for environments that don't
-# support native ASGI. Vercel will prefer the `app` ASGI variable above.
 try:
     from mangum import Mangum  # noqa: E402
-    handler = Mangum(app, lifespan="off")
-except Exception:
-    handler = None
+    # Expose the Mangum WSGI handler as `app` so Vercel uses the WSGI path.
+    app = Mangum(_asgi_app, lifespan="off")
+except Exception as e:
+    print(f"[vercel] Mangum unavailable ({e}); falling back to raw ASGI")
+    app = _asgi_app

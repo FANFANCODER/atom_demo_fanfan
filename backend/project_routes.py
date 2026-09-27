@@ -6,10 +6,11 @@ import time
 import secrets
 import asyncio
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Body
 from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 
 from database import (
     User, Project, Message, FileSnapshot, Deployment, get_db,
@@ -89,11 +90,14 @@ def list_projects(user: User = Depends(get_current_user), db: Session = Depends(
 
 
 @router.post("")
-def create_project(body: CreateProjectIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_project(body: Optional[CreateProjectIn] = Body(default=None),
+                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    name = (body.name if body else None) or "Untitled"
+    template_type = (body.template_type if body else None) or "static-html"
     p = Project(
         id=secrets.token_urlsafe(12), user_id=user.id,
-        slug=_new_slug(db, body.name), name=body.name[:80] or "Untitled",
-        template_type=body.template_type, status="BUILDING",
+        slug=_new_slug(db, name), name=name[:80] or "Untitled",
+        template_type=template_type, status="BUILDING",
         sandbox_state="COLD",
     )
     db.add(p)
@@ -147,19 +151,26 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
     user_msg = Message(id=secrets.token_urlsafe(12), project_id=p.id, role="user", content=body.content)
     db.add(user_msg)
     db.commit()
+    # snapshot the values we need before db session closes
+    project_id_safe = p.id
+    project_slug = p.slug
+    project_name = p.name
+    user_msg_id = user_msg.id
+    # close the dependency session so its connection returns to the pool
+    # before the streaming response opens its own session
+    db.close()
 
     async def event_stream():
-        # helper to send db writes in background thread safely — we use a new session per write
         from database import SessionLocal
         ldb = SessionLocal()
         try:
             yield _sse("status", "正在为你生成网站…")
             await asyncio.sleep(0.2)
+
             # generate the site
             result = await generate_site(body.content)
-            title = result.get("title", p.name or "My Site")
+            title = result.get("title", project_name or "My Site")
             files = result["files"]
-            # ensure index.html
             if "index.html" not in files:
                 files["index.html"] = "<html><body>Hello</body></html>"
 
@@ -167,54 +178,61 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
 
             # create a deployment
             dep = Deployment(
-                id=secrets.token_urlsafe(12), project_id=p.id,
+                id=secrets.token_urlsafe(12), project_id=project_id_safe,
                 status="BUILDING", kind="static",
             )
             ldb.add(dep)
             ldb.commit()
 
             # store the built site
-            artifact_key = storage.put_site(p.id, dep.id, files)
+            artifact_key = storage.put_site(project_id_safe, dep.id, files)
             base_url = get_base_url(request)
-            url = f"{base_url}/sites/{p.slug}/index.html"
+            url = f"{base_url}/sites/{project_slug}/index.html"
             dep.status = "LIVE"
             dep.artifact_key = artifact_key
             dep.url = url
             dep.duration_ms = 1200
             ldb.commit()
 
-            p.status = "LIVE"
-            p.public_url = url
-            p.sandbox_state = "WARM"
-            p.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            # merge p into ldb session so the update persists
-            ldb.merge(p)
-            ldb.commit()
+            # reload project in this session and update
+            proj = ldb.query(Project).filter(Project.id == project_id_safe).first()
+            if proj:
+                proj.status = "LIVE"
+                proj.public_url = url
+                proj.sandbox_state = "WARM"
+                proj.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                ldb.commit()
 
             # save snapshot
             tree = storage.compute_tree(files)
             snap_id = secrets.token_urlsafe(12)
-            storage.put_snapshot(p.id, snap_id, files)
-            # mark previous latest as false
-            ldb.query(FileSnapshot).filter(FileSnapshot.project_id == p.id).update({FileSnapshot.is_latest: False}, synchronize_session=False)
+            storage.put_snapshot(project_id_safe, snap_id, files)
+            ldb.query(FileSnapshot).filter(FileSnapshot.project_id == project_id_safe).update(
+                {FileSnapshot.is_latest: False}, synchronize_session=False)
             snap = FileSnapshot(
-                id=snap_id, project_id=p.id, tree=tree,
-                storage_key=f"{p.id}/{snap_id}.tar.gz",
+                id=snap_id, project_id=project_id_safe, tree=tree,
+                storage_key=f"{project_id_safe}/{snap_id}.tar.gz",
                 size_bytes=sum(len(c) for c in files.values()),
-                is_latest=True, message_id=user_msg.id,
+                is_latest=True, message_id=user_msg_id,
             )
             ldb.add(snap)
             ldb.commit()
 
             # assistant message
             assistant_content = f"已为你生成网站：{title}\n\n预览地址：{url}\n\n包含文件：{', '.join(files.keys())}"
-            amsg = Message(id=secrets.token_urlsafe(12), project_id=p.id, role="assistant", content=assistant_content)
+            amsg = Message(id=secrets.token_urlsafe(12), project_id=project_id_safe,
+                           role="assistant", content=assistant_content)
             ldb.add(amsg)
             ldb.commit()
 
             yield _sse("assistant", assistant_content)
             yield _sse("deployment", {"status": "LIVE", "url": url, "id": dep.id})
             yield _sse("done", {"ok": True})
+        except Exception as e:
+            print(f"[send_message] stream error: {e}")
+            import traceback
+            traceback.print_exc()
+            yield _sse("error", str(e))
         finally:
             ldb.close()
 

@@ -7,6 +7,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [user, setUser] = useState(null)
+  const [input, setInput] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -14,15 +15,25 @@ export default function Dashboard() {
     apiJson('/api/projects').then(p => { setProjects(p); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  async function createProject() {
+  async function startChat(e) {
+    e?.preventDefault()
+    const content = input.trim()
+    if (!content || creating) return
     setCreating(true)
     try {
-      const p = await apiJson('/api/projects', { method: 'POST' })
-      navigate(`/project/${p.id}`)
+      const p = await apiJson('/api/projects', { method: 'POST', body: JSON.stringify({ name: content.slice(0, 30) || '新项目' }) })
+      navigate(`/project/${p.id}?msg=${encodeURIComponent(content)}`)
     } catch (e) {
       alert('创建失败：' + e.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      startChat()
     }
   }
 
@@ -44,11 +55,28 @@ export default function Dashboard() {
         </div>
       </nav>
 
+      {/* Hero chat input — natural project creation */}
+      <div className="dash-hero">
+        <h1 className="hero-title">用一句话，搭建你的网站</h1>
+        <p className="hero-sub">描述你想要的网站，Atom 会自动创建项目并为你生成。</p>
+        <form className="dash-chat-form" onSubmit={startChat}>
+          <textarea
+            className="input dash-chat-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="例如：做个个人主页，我叫 Alice，喜欢摄影和旅行…"
+            disabled={creating}
+            rows={2}
+          />
+          <button className="btn dash-chat-btn" disabled={creating || !input.trim()}>
+            {creating ? <><div className="spinner" /> 创建中…</> : '生成 →'}
+          </button>
+        </form>
+      </div>
+
       <div className="dash-header">
         <h2>我的项目</h2>
-        <button className="btn" onClick={createProject} disabled={creating}>
-          {creating ? '创建中…' : '+ 新建项目'}
-        </button>
       </div>
 
       {loading ? (
@@ -56,10 +84,7 @@ export default function Dashboard() {
       ) : projects.length === 0 ? (
         <div className="card empty-state">
           <h3>还没有项目</h3>
-          <p>用一句话开始搭建你的第一个网站</p>
-          <button className="btn lg" onClick={createProject} disabled={creating}>
-            {creating ? '创建中…' : '创建第一个项目'}
-          </button>
+          <p>在上方输入框描述你的网站需求，即可开始创建</p>
         </div>
       ) : (
         <div className="project-grid">
