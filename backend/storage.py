@@ -5,6 +5,7 @@ Two backends:
 - Vercel Blob (when BLOB_READ_WRITE_TOKEN is set): stores blobs via the Blob REST API.
 
 The interface is identical so the rest of the app does not care which backend is used.
+When Blob upload fails, we automatically fall back to local filesystem storage.
 """
 import os
 import io
@@ -142,8 +143,11 @@ def put_snapshot(project_id: str, snapshot_id: str, files: dict) -> str:
     data = _tar_files(files)
     key = f"snapshots/{project_id}/{snapshot_id}.tar.gz"
     if USE_BLOB:
-        url = _blob_put(key, data, "application/gzip")
-        return url  # store the blob URL as the key
+        try:
+            url = _blob_put(key, data, "application/gzip")
+            return url  # store the blob URL as the key
+        except Exception as e:
+            print(f"[storage] blob put_snapshot failed, falling back to local: {e}")
     full = _safe_path(SNAPSHOTS_DIR, f"{project_id}/{snapshot_id}.tar.gz")
     os.makedirs(os.path.dirname(full), exist_ok=True)
     with open(full, "wb") as f:
@@ -153,9 +157,13 @@ def put_snapshot(project_id: str, snapshot_id: str, files: dict) -> str:
 
 def get_snapshot(storage_key: str) -> dict:
     """Returns {path: content_bytes} from a stored tar.gz."""
-    if USE_BLOB:
-        data = _blob_get(storage_key)
-        return _untar_bytes(data)
+    if storage_key.startswith("http"):
+        try:
+            data = _blob_get(storage_key)
+            return _untar_bytes(data)
+        except Exception as e:
+            print(f"[storage] blob get_snapshot failed: {e}")
+            return {}
     full = _safe_path(SNAPSHOTS_DIR, storage_key)
     if not os.path.exists(full):
         return {}
@@ -169,8 +177,11 @@ def put_site(project_id: str, deployment_id: str, files: dict) -> str:
         # store the whole site as a tar.gz blob; serve_site_file extracts on demand
         data = _tar_files(files)
         key = f"sites/{project_id}/{deployment_id}.tar.gz"
-        url = _blob_put(key, data, "application/gzip")
-        return url
+        try:
+            url = _blob_put(key, data, "application/gzip")
+            return url
+        except Exception as e:
+            print(f"[storage] blob put_site failed, falling back to local: {e}")
     key = f"{project_id}/{deployment_id}"
     base = _safe_path(SITES_DIR, key)
     os.makedirs(base, exist_ok=True)
@@ -186,13 +197,17 @@ def put_site(project_id: str, deployment_id: str, files: dict) -> str:
 
 def get_site_file(artifact_key: str, rel_path: str):
     """Return content_bytes for a deployed site file, or None."""
-    if USE_BLOB:
-        data = _blob_get(artifact_key)
-        files = _untar_bytes(data)
-        content = files.get(rel_path)
-        if content is None and rel_path != "index.html":
-            content = files.get("index.html")
-        return content
+    if artifact_key.startswith("http"):
+        try:
+            data = _blob_get(artifact_key)
+            files = _untar_bytes(data)
+            content = files.get(rel_path)
+            if content is None and rel_path != "index.html":
+                content = files.get("index.html")
+            return content
+        except Exception as e:
+            print(f"[storage] blob get_site_file failed: {e}")
+            return None
     base = _safe_path(SITES_DIR, artifact_key)
     full = _safe_path(base, rel_path)
     if not os.path.exists(full) or not os.path.isfile(full):
@@ -206,7 +221,7 @@ def site_dir(artifact_key: str) -> str:
 
 
 def delete_site(artifact_key: str):
-    if USE_BLOB:
+    if artifact_key.startswith("http"):
         _blob_delete(artifact_key)
         return
     import shutil
