@@ -95,6 +95,16 @@ def get_session_user(db: Session, sid: str):
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    # Guest mode: when ATOM_DISABLE_AUTH=1, skip auth and use a demo user
+    if os.environ.get("ATOM_DISABLE_AUTH", "") == "1":
+        user = db.query(User).filter(User.email == "guest@atom.local").first()
+        if not user:
+            user = User(id=secrets.token_urlsafe(16), email="guest@atom.local",
+                        password_hash="", plan="free", status="ACTIVE")
+            db.add(user)
+            db.commit()
+        return user
+
     sid = request.cookies.get(SESSION_COOKIE)
     s = get_session_user(db, sid)
     if not s:
