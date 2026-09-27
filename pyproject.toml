@@ -1,2 +1,24 @@
+[project]
+name = "atom"
+version = "0.4.0"
+description = "Atom - conversational website builder"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+    "sqlalchemy>=2.0",
+    "argon2-cffi>=23",
+    "python-multipart>=0.0.6",
+    "aiofiles>=23",
+    "httpx>=0.25",
+    "jinja2>=3.1",
+    "mangum>=0.17",
+    "psycopg2-binary>=2.9",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [tool.vercel]
 entrypoint = "backend.main:app"
