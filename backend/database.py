@@ -13,9 +13,17 @@ if not DB_URL:
     DB_PATH = os.environ.get("ATOM_DB_PATH", os.path.join(os.path.dirname(__file__), "atom.db"))
     DB_URL = f"sqlite:///{DB_PATH}"
 
-# Vercel Postgres URLs may start with postgres://; SQLAlchemy 2.x wants postgresql://
+# Vercel Postgres URLs may start with postgres:// or postgresql://.
+# SQLAlchemy 2.x defaults to psycopg3; we use psycopg2-binary, so force +psycopg2.
 if DB_URL.startswith("postgres://"):
-    DB_URL = "postgresql://" + DB_URL[len("postgres://"):]
+    DB_URL = "postgresql+psycopg2://" + DB_URL[len("postgres://"):]
+elif DB_URL.startswith("postgresql://"):
+    DB_URL = "postgresql+psycopg2://" + DB_URL[len("postgresql://"):]
+
+# Neon requires SSL; ensure sslmode=require is present.
+if DB_URL.startswith("postgresql+psycopg2://") and "sslmode=" not in DB_URL:
+    sep = "&" if "?" in DB_URL else "?"
+    DB_URL = f"{DB_URL}{sep}sslmode=require"
 
 _connect_args = {}
 if DB_URL.startswith("sqlite"):
