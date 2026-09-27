@@ -2,6 +2,9 @@
 
 Uses an LLM (OpenAI-compatible) if OPENAI_API_KEY is set; otherwise falls back
 to a smart template generator that produces polished single-page sites.
+
+The streaming entry point (``generate_site_stream``) yields SSE-friendly events
+so the caller can surface the model's thinking/reasoning process in real time.
 """
 import os
 import re
@@ -33,12 +36,36 @@ Rules:
 - Output valid JSON only, no markdown fences, no commentary."""
 
 
-async def generate_with_llm(prompt: str) -> dict:
+def _strip_fences(content: str) -> str:
+    content = content.strip()
+    content = re.sub(r"^```(?:json)?\s*", "", content)
+    content = re.sub(r"\s*```$", "", content)
+    return content.strip()
+
+
+async def generate_with_llm_stream(prompt: str):
+    """Async generator that streams the LLM response.
+
+    Yields dicts:
+      {"type": "llm_status", "message": str}
+      {"type": "llm_chunk", "content": str}      # main content token
+      {"type": "llm_reasoning", "content": str}   # reasoning/thinking token
+      {"type": "llm_error", "error": str}
+      {"type": "done", "data": dict | None}       # final parsed result
+    """
     if not LLM_API_KEY:
-        return None
+        yield {"type": "llm_error", "error": "未配置 OPENAI_API_KEY，跳过 LLM 调用"}
+        yield {"type": "done", "data": None}
+        return
+
+    yield {"type": "llm_status", "message": f"正在调用大模型 {LLM_MODEL} …"}
+
+    full_content = ""
+    full_reasoning = ""
     try:
-        async with httpx.AsyncClient(timeout=45) as client:
-            r = await client.post(
+        async with httpx.AsyncClient(timeout=90) as client:
+            async with client.stream(
+                "POST",
                 f"{LLM_BASE_URL}/chat/completions",
                 headers={"Authorization": f"Bearer {LLM_API_KEY}"},
                 json={
@@ -48,20 +75,85 @@ async def generate_with_llm(prompt: str) -> dict:
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.7,
+                    "stream": True,
                 },
-            )
-            r.raise_for_status()
-            content = r.json()["choices"][0]["message"]["content"]
-            # strip code fences if present
-            content = re.sub(r"^```(?:json)?\s*", "", content.strip())
-            content = re.sub(r"\s*```$", "", content)
-            data = json.loads(content)
-            if "files" in data and "index.html" in data["files"]:
-                return data
+            ) as resp:
+                if resp.status_code >= 400:
+                    body = (await resp.aread()).decode("utf-8", errors="replace")
+                    print(f"[agent] LLM HTTP {resp.status_code}: {body[:500]}")
+                    yield {"type": "llm_error",
+                           "error": f"LLM HTTP {resp.status_code}: {body[:300]}"}
+                    yield {"type": "done", "data": None}
+                    return
+
+                async for line in resp.aiter_lines():
+                    if not line:
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        obj = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = obj.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    reasoning = delta.get("reasoning_content") or delta.get("reasoning") or ""
+                    if reasoning:
+                        full_reasoning += reasoning
+                        yield {"type": "llm_reasoning", "content": reasoning}
+                    content = delta.get("content") or ""
+                    if content:
+                        full_content += content
+                        yield {"type": "llm_chunk", "content": content}
+    except httpx.TimeoutException:
+        print("[agent] LLM request timed out")
+        yield {"type": "llm_error", "error": "LLM 请求超时"}
+        yield {"type": "done", "data": None}
+        return
     except Exception as e:
-        print(f"[agent] LLM generation failed: {e}")
-        return None
-    return None
+        print(f"[agent] LLM stream failed: {e}")
+        yield {"type": "llm_error", "error": f"LLM 调用失败: {e}"}
+        yield {"type": "done", "data": None}
+        return
+
+    content_to_parse = full_content.strip()
+    if not content_to_parse:
+        print("[agent] LLM returned empty content")
+        yield {"type": "llm_error", "error": "LLM 返回内容为空"}
+        yield {"type": "done", "data": None}
+        return
+
+    content_to_parse = _strip_fences(content_to_parse)
+    try:
+        data = json.loads(content_to_parse)
+    except json.JSONDecodeError as e:
+        print(f"[agent] LLM JSON parse failed: {e}; content[:200]={content_to_parse[:200]!r}")
+        yield {"type": "llm_error", "error": f"LLM 输出 JSON 解析失败: {e}"}
+        yield {"type": "done", "data": None}
+        return
+
+    if "files" in data and "index.html" in data["files"]:
+        yield {"type": "done", "data": data}
+        return
+
+    print("[agent] LLM response missing files/index.html")
+    yield {"type": "llm_error", "error": "LLM 输出缺少 files.index.html"}
+    yield {"type": "done", "data": None}
+
+
+async def generate_with_llm(prompt: str) -> dict:
+    """Non-streaming wrapper kept for compatibility."""
+    result = None
+    async for evt in generate_with_llm_stream(prompt):
+        if evt["type"] == "done":
+            result = evt["data"]
+            break
+    return result
 
 
 # ---------- Template fallback generator ----------
@@ -91,7 +183,6 @@ def _detect_type(prompt: str) -> str:
 
 
 def _extract_name(prompt: str) -> str:
-    # look for quoted name or "我叫 X" / "my name is X" / "called X"
     m = re.search(r"[\"'‘’“”]([^\"'‘’“”]{2,30})[\"'‘’“”]", prompt)
     if m:
         return m.group(1)
@@ -297,12 +388,39 @@ header h1{{font-size:clamp(2rem,5vw,3rem)}}
 </body></html>"""
 
 
+async def generate_site_stream(prompt: str):
+    """Async generator that yields LLM thinking events and finally the result.
+
+    Yields the same event types as ``generate_with_llm_stream`` plus a final
+    ``{"type": "done", "data": {...}}`` carrying the chosen site (LLM or
+    template fallback).
+    """
+    used_template = False
+    if LLM_API_KEY:
+        async for evt in generate_with_llm_stream(prompt):
+            if evt["type"] == "done":
+                if evt["data"] is not None:
+                    yield evt
+                    return
+            else:
+                yield evt
+    else:
+        yield {"type": "llm_error", "error": "未配置 OPENAI_API_KEY，使用模板生成"}
+
+    used_template = True
+    yield {"type": "llm_status", "message": "使用内置模板生成网站…"}
+    await asyncio.sleep(0.5)
+    result = generate_template(prompt)
+    if used_template:
+        yield {"type": "llm_status", "message": "模板生成完成"}
+    yield {"type": "done", "data": result}
+
+
 async def generate_site(prompt: str) -> dict:
     """Return {title, files}. Tries LLM first, then template fallback."""
-    if LLM_API_KEY:
-        result = await generate_with_llm(prompt)
-        if result:
-            return result
-    # small delay to simulate thinking
-    await asyncio.sleep(0.5)
-    return generate_template(prompt)
+    result = None
+    async for evt in generate_site_stream(prompt):
+        if evt["type"] == "done":
+            result = evt["data"]
+            break
+    return result
