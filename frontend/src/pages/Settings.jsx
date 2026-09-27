@@ -54,7 +54,7 @@ export default function Settings() {
 
       <div className="card settings-section">
         <h3>账号信息</h3>
-        {user && <p style={{ color: 'var(--muted)' }}>邮箱：{user.email} · 套餐：{user.plan}</p>}
+        {user && <p style={{ color: 'var(--text-secondary)' }}>邮箱：{user.email} · 套餐：{user.plan}</p>}
       </div>
 
       <div className="card settings-section">
@@ -76,7 +76,7 @@ export default function Settings() {
 
       <div className="card settings-section">
         <h3>会话</h3>
-        <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
           修改密码会自动下线其他设备。也可以手动登出当前设备。
         </p>
         <button className="btn secondary" onClick={logoutAll}>登出当前设备</button>
@@ -84,7 +84,7 @@ export default function Settings() {
 
       <div className="card settings-section">
         <h3 style={{ color: 'var(--danger)' }}>危险操作</h3>
-        <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
           删除账号将永久清除你的所有项目、对话和数据。
         </p>
         <button className="btn danger" onClick={deleteAccount}>删除账号</button>

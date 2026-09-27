@@ -31,7 +31,11 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <div className="card auth-card">
-        <h1 className="gradient-text">Atom</h1>
+        <div className="brand-row">
+          <div className="brand-logo">A</div>
+          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.03em' }}>Atom</span>
+        </div>
+        <h1>欢迎回来</h1>
         <p className="sub">对话式建站，用一句话生成你的网站</p>
         {error && <div className="error">{error}</div>}
         <form onSubmit={submit}>
@@ -43,9 +47,9 @@ export default function Login() {
             <label className="label">密码</label>
             <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="至少 8 位" required />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <input id="rm" type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
-            <label htmlFor="rm" style={{ fontSize: 13, color: 'var(--muted)' }}>记住我（30 天）</label>
+            <label htmlFor="rm" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>记住我（30 天）</label>
           </div>
           <button className="btn" disabled={loading}>{loading ? '登录中…' : '登录'}</button>
         </form>

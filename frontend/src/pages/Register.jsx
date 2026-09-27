@@ -32,7 +32,11 @@ export default function Register() {
   return (
     <div className="auth-wrap">
       <div className="card auth-card">
-        <h1 className="gradient-text">创建账号</h1>
+        <div className="brand-row">
+          <div className="brand-logo">A</div>
+          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.03em' }}>Atom</span>
+        </div>
+        <h1>创建账号</h1>
         <p className="sub">注册后即可开始用对话搭建网站</p>
         {error && <div className="error">{error}</div>}
         <form onSubmit={submit}>

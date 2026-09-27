@@ -120,8 +120,9 @@ export default function Project() {
       <nav className="nav">
         <div className="brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>Atom<span>.</span></div>
         <div className="nav-right">
-          <button className="btn ghost" style={{ padding: '6px 12px', fontSize: 13 }} onClick={deleteProject}>删除项目</button>
-          {user && <span style={{ fontSize: 13, color: 'var(--muted)' }}>{user.email}</span>}
+          <Link to="/dashboard" className="btn ghost sm">← 工作台</Link>
+          <button className="btn ghost sm" onClick={deleteProject}>删除项目</button>
+          {user && <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{user.email}</span>}
         </div>
       </nav>
 
@@ -130,7 +131,7 @@ export default function Project() {
         <div className="card chat-panel">
           <div className="chat-messages" ref={scrollRef}>
             {messages.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
                 描述你想要的网站，例如：「做个个人主页，我叫 Alice」
               </div>
             )}
@@ -160,10 +161,10 @@ export default function Project() {
             {previewUrl ? (
               <a className="url" href={previewUrl} target="_blank" rel="noreferrer">{previewUrl}</a>
             ) : (
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>尚未发布</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>尚未发布</span>
             )}
             {previewUrl && (
-              <a href={previewUrl} target="_blank" rel="noreferrer" className="btn ghost" style={{ padding: '4px 10px', fontSize: 12 }}>新窗口打开</a>
+              <a href={previewUrl} target="_blank" rel="noreferrer" className="btn ghost sm">新窗口打开</a>
             )}
           </div>
           {previewUrl ? (
