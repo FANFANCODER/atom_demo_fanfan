@@ -33,8 +33,11 @@ BASE_DIR = Path(__file__).resolve().parent
 
 @app.on_event("startup")
 def startup():
-    init_db()
-    print("[atom] DB initialized")
+    try:
+        init_db()
+        print("[atom] DB initialized")
+    except Exception as e:
+        print(f"[atom] init_db error: {e}")
 
 
 @app.get("/api/health")
