@@ -162,8 +162,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
                 etype = evt.get("type")
                 if etype == "llm_status":
                     yield _sse("status", evt.get("message", ""))
-                elif etype == "llm_chunk":
-                    yield _sse("llm_chunk", evt.get("content", ""))
                 elif etype == "llm_reasoning":
                     yield _sse("llm_reasoning", evt.get("content", ""))
                 elif etype == "llm_error":

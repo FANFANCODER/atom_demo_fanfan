@@ -12,7 +12,6 @@ export default function Project() {
   const [sending, setSending] = useState(false)
   const [user, setUser] = useState(null)
   const [llmThinking, setLlmThinking] = useState('')
-  const [llmOutput, setLlmOutput] = useState('')
   const scrollRef = useRef(null)
   const abortRef = useRef(null)
   const initialSentRef = useRef(false)
@@ -53,7 +52,6 @@ export default function Project() {
     if (!content || sending) return
     setSending(true)
     setLlmThinking('')
-    setLlmOutput('')
     const userMsg = { id: Date.now(), role: 'user', content }
     setMessages(m => [...m, userMsg])
 
@@ -94,8 +92,6 @@ export default function Project() {
             setMessages(m => [...m.filter(x => !x._status), { id: 'a' + Date.now(), role: 'assistant', content: data }])
           } else if (evt === 'llm_reasoning') {
             setLlmThinking(t => t + data)
-          } else if (evt === 'llm_chunk') {
-            setLlmOutput(o => o + data)
           } else if (evt === 'llm_error') {
             setMessages(m => [...m, { id: 'le' + Date.now(), role: 'tool', content: '⚠️ ' + data, _llmerror: true }])
           } else if (evt === 'deployment') {
@@ -109,7 +105,6 @@ export default function Project() {
       const msgs = await apiJson(`/api/projects/${id}/messages`)
       setMessages(msgs)
       setLlmThinking('')
-      setLlmOutput('')
     } catch (e) {
       if (e.name !== 'AbortError') {
         setMessages(m => [...m, { id: 'e' + Date.now(), role: 'assistant', content: '出错了：' + (e.message || '未知错误') }])
@@ -161,35 +156,19 @@ export default function Project() {
             ))}
           </div>
 
-          {(llmThinking || llmOutput) && (
+          {llmThinking && (
             <div className="llm-stream" style={{
               margin: '0 12px 8px', padding: '10px 12px',
               background: 'rgba(79,70,229,0.06)', border: '1px solid rgba(79,70,229,0.15)',
               borderRadius: 12, fontSize: 12.5, maxHeight: 220, overflowY: 'auto',
             }}>
-              {llmThinking && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    🧠 模型思考过程
-                  </div>
-                  <pre style={{
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
-                    color: 'var(--text-muted)', fontFamily: 'inherit',
-                  }}>{llmThinking}</pre>
-                </div>
-              )}
-              {llmOutput && (
-                <div>
-                  <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                    📝 模型输出
-                  </div>
-                  <pre style={{
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
-                    color: 'var(--text)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    fontSize: 11.5,
-                  }}>{llmOutput}</pre>
-                </div>
-              )}
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                🧠 模型思考过程
+              </div>
+              <pre style={{
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
+                color: 'var(--text-muted)', fontFamily: 'inherit',
+              }}>{llmThinking}</pre>
             </div>
           )}
 
