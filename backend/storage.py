@@ -1,17 +1,19 @@
 """File storage abstraction.
 
-Two backends:
-- Local filesystem (default, for local dev): stores tar.gz snapshots and site files on disk.
-- Vercel Blob (when BLOB_READ_WRITE_TOKEN is set): stores blobs via the Blob REST API.
+Three backends (tried in order):
+1. Vercel Blob (when BLOB_READ_WRITE_TOKEN is set): stores blobs via the Blob REST API.
+2. Database (SiteFile table): persistent, works on any serverless instance.
+3. Local filesystem: only for local dev.
 
 The interface is identical so the rest of the app does not care which backend is used.
-When Blob upload fails, we automatically fall back to local filesystem storage.
 """
 import os
 import io
 import json
+import base64
 import tarfile
 import hashlib
+import secrets
 import httpx
 from pathlib import Path
 
@@ -138,6 +140,48 @@ def _blob_list(prefix: str):
 
 
 # ---------- public API ----------
+def _db_put_site(deployment_id: str, files: dict) -> str:
+    """Store site files in the DB SiteFile table. Returns artifact_key prefixed with 'db:'."""
+    from database import SessionLocal, SiteFile
+    db = SessionLocal()
+    try:
+        db.query(SiteFile).filter(SiteFile.deployment_id == deployment_id).delete()
+        for path, content in files.items():
+            if path.startswith("/") or ".." in path:
+                continue
+            data = content if isinstance(content, bytes) else content.encode("utf-8")
+            sf = SiteFile(
+                id=secrets.token_urlsafe(12),
+                deployment_id=deployment_id,
+                path=path,
+                content=base64.b64encode(data).decode("ascii"),
+            )
+            db.add(sf)
+        db.commit()
+        return f"db:{deployment_id}"
+    finally:
+        db.close()
+
+
+def _db_get_site_file(deployment_id: str, rel_path: str):
+    """Read a site file from the DB SiteFile table."""
+    from database import SessionLocal, SiteFile
+    db = SessionLocal()
+    try:
+        sf = db.query(SiteFile).filter(
+            SiteFile.deployment_id == deployment_id, SiteFile.path == rel_path
+        ).first()
+        if sf is None and rel_path != "index.html":
+            sf = db.query(SiteFile).filter(
+                SiteFile.deployment_id == deployment_id, SiteFile.path == "index.html"
+            ).first()
+        if sf is None:
+            return None
+        return base64.b64decode(sf.content)
+    finally:
+        db.close()
+
+
 def put_snapshot(project_id: str, snapshot_id: str, files: dict) -> str:
     """files: {path: content_bytes}. Returns storage_key."""
     data = _tar_files(files)
@@ -181,18 +225,9 @@ def put_site(project_id: str, deployment_id: str, files: dict) -> str:
             url = _blob_put(key, data, "application/gzip")
             return url
         except Exception as e:
-            print(f"[storage] blob put_site failed, falling back to local: {e}")
-    key = f"{project_id}/{deployment_id}"
-    base = _safe_path(SITES_DIR, key)
-    os.makedirs(base, exist_ok=True)
-    for path, content in files.items():
-        if path.startswith("/") or ".." in path:
-            continue
-        full = os.path.join(base, path)
-        os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "wb") as f:
-            f.write(content if isinstance(content, bytes) else content.encode("utf-8"))
-    return key
+            print(f"[storage] blob put_site failed, falling back to DB: {e}")
+    # Fallback: store in database (persistent across serverless instances)
+    return _db_put_site(deployment_id, files)
 
 
 def get_site_file(artifact_key: str, rel_path: str):
@@ -208,6 +243,10 @@ def get_site_file(artifact_key: str, rel_path: str):
         except Exception as e:
             print(f"[storage] blob get_site_file failed: {e}")
             return None
+    if artifact_key.startswith("db:"):
+        deployment_id = artifact_key[3:]
+        return _db_get_site_file(deployment_id, rel_path)
+    # Local filesystem fallback (for local dev / old entries)
     base = _safe_path(SITES_DIR, artifact_key)
     full = _safe_path(base, rel_path)
     if not os.path.exists(full) or not os.path.isfile(full):
@@ -223,6 +262,16 @@ def site_dir(artifact_key: str) -> str:
 def delete_site(artifact_key: str):
     if artifact_key.startswith("http"):
         _blob_delete(artifact_key)
+        return
+    if artifact_key.startswith("db:"):
+        from database import SessionLocal, SiteFile
+        deployment_id = artifact_key[3:]
+        db = SessionLocal()
+        try:
+            db.query(SiteFile).filter(SiteFile.deployment_id == deployment_id).delete()
+            db.commit()
+        finally:
+            db.close()
         return
     import shutil
     base = _safe_path(SITES_DIR, artifact_key)

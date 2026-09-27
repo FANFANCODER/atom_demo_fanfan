@@ -148,6 +148,20 @@ class Deployment(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     project = relationship("Project", back_populates="deployments")
+    files = relationship("SiteFile", back_populates="deployment", cascade="all, delete-orphan")
+
+
+class SiteFile(Base):
+    """Stores generated site files in the DB (used when Blob is unavailable)."""
+    __tablename__ = "site_files"
+    id = Column(String, primary_key=True)
+    deployment_id = Column(String, ForeignKey("deployments.id", ondelete="CASCADE"), nullable=False, index=True)
+    path = Column(String, nullable=False)
+    content = Column(Text, nullable=False)  # base64-encoded bytes
+
+    deployment = relationship("Deployment", back_populates="files")
+
+    __table_args__ = (Index("idx_site_file_deploy_path", "deployment_id", "path"),)
 
 
 def init_db():
