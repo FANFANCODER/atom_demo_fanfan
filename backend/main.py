@@ -1,6 +1,7 @@
 """Atom backend entrypoint: FastAPI app with auth, projects, static sites, and frontend."""
 import os
 import sys
+import signal
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -31,13 +32,33 @@ app.include_router(project_routes.router)
 BASE_DIR = Path(__file__).resolve().parent
 
 
+class _InitTimeoutError(Exception):
+    pass
+
+
+def _init_timeout_handler(signum, frame):
+    raise _InitTimeoutError("init_db timed out")
+
+
 @app.on_event("startup")
 def startup():
+    # Protect cold start from an unreachable/slow DB. Vercel serverless
+    # functions have limited time; don't let init_db hang forever.
     try:
+        signal.signal(signal.SIGALRM, _init_timeout_handler)
+        signal.alarm(8)
         init_db()
+        signal.alarm(0)
         print("[atom] DB initialized")
+    except _InitTimeoutError:
+        print("[atom] init_db timed out (DB unreachable?), continuing")
     except Exception as e:
         print(f"[atom] init_db error: {e}")
+    finally:
+        try:
+            signal.alarm(0)
+        except Exception:
+            pass
 
 
 @app.get("/api/health")
