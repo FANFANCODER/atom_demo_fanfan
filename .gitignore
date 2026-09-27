@@ -32,3 +32,6 @@ cookie.txt
 # Trae
 .trae-html-share-packages/
 .trae/
+
+# User uploads
+.uploads/

@@ -37,8 +37,11 @@ engine = create_engine(
     DB_URL,
     connect_args=_connect_args,
     pool_pre_ping=True,
-    pool_size=1,
-    max_overflow=0,
+    # Allow enough connections so that nested session usage (e.g. storage
+    # functions opening their own SessionLocal while a request session is
+    # still open) does not exhaust the pool and hang the request.
+    pool_size=5,
+    max_overflow=10,
     pool_recycle=60,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
