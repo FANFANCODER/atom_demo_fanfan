@@ -28,8 +28,19 @@ if DB_URL.startswith("postgresql+psycopg2://") and "sslmode=" not in DB_URL:
 _connect_args = {}
 if DB_URL.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}
+else:
+    # Postgres: limit connection time so a slow/unreachable DB doesn't hang
+    # the serverless function during cold start.
+    _connect_args = {"connect_timeout": 5}
 
-engine = create_engine(DB_URL, connect_args=_connect_args, pool_pre_ping=True)
+engine = create_engine(
+    DB_URL,
+    connect_args=_connect_args,
+    pool_pre_ping=True,
+    pool_size=1,
+    max_overflow=0,
+    pool_recycle=60,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
