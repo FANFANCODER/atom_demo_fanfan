@@ -1,4 +1,3 @@
-"""Project routes: CRUD, messages (SSE agent loop), files, snapshots, deployments."""
 import os
 import io
 import json
@@ -17,7 +16,7 @@ from database import (
 )
 from auth import get_current_user
 import storage
-from agent import generate_site
+from agent import generate_site_stream
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -25,12 +24,8 @@ PUBLIC_BASE_URL = os.environ.get("ATOM_PUBLIC_URL", "")
 
 
 def get_base_url(request: Request) -> str:
-    """Derive the public base URL from the request, honoring proxy headers.
-    If ATOM_PUBLIC_URL is set, use it. Otherwise return '' so the stored URL
-    is a relative path (the frontend prepends window.location.origin)."""
     if PUBLIC_BASE_URL:
         return PUBLIC_BASE_URL.rstrip("/")
-    # No fixed public URL: store relative path, frontend resolves against origin.
     return ""
 
 
@@ -45,7 +40,6 @@ def _new_slug(db: Session, name: str) -> str:
 
 def re_slugify(s: str) -> str:
     import re
-    # strip non-ASCII for URL safety; keep a-z0-9
     s = s.lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     s = s.strip("-")
@@ -118,7 +112,6 @@ def get_project(project_id: str, user: User = Depends(get_current_user), db: Ses
 @router.delete("/{project_id}")
 def delete_project(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = _own_project(db, user, project_id)
-    # clean S3 artifacts
     for dep in db.query(Deployment).filter(Deployment.project_id == p.id).all():
         if dep.artifact_key:
             try:
@@ -151,13 +144,10 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
     user_msg = Message(id=secrets.token_urlsafe(12), project_id=p.id, role="user", content=body.content)
     db.add(user_msg)
     db.commit()
-    # snapshot the values we need before db session closes
     project_id_safe = p.id
     project_slug = p.slug
     project_name = p.name
     user_msg_id = user_msg.id
-    # close the dependency session so its connection returns to the pool
-    # before the streaming response opens its own session
     db.close()
 
     async def event_stream():
@@ -167,8 +157,25 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             yield _sse("status", "正在为你生成网站…")
             await asyncio.sleep(0.2)
 
-            # generate the site
-            result = await generate_site(body.content)
+            result = None
+            async for evt in generate_site_stream(body.content):
+                etype = evt.get("type")
+                if etype == "llm_status":
+                    yield _sse("status", evt.get("message", ""))
+                elif etype == "llm_chunk":
+                    yield _sse("llm_chunk", evt.get("content", ""))
+                elif etype == "llm_reasoning":
+                    yield _sse("llm_reasoning", evt.get("content", ""))
+                elif etype == "llm_error":
+                    yield _sse("llm_error", evt.get("error", ""))
+                elif etype == "done":
+                    result = evt.get("data")
+                    break
+
+            if not result:
+                yield _sse("error", "生成失败：未获得有效结果")
+                return
+
             title = result.get("title", project_name or "My Site")
             files = result["files"]
             if "index.html" not in files:
@@ -176,7 +183,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
 
             yield _sse("status", f"生成完成：{title}")
 
-            # create a deployment
             dep = Deployment(
                 id=secrets.token_urlsafe(12), project_id=project_id_safe,
                 status="BUILDING", kind="static",
@@ -184,7 +190,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             ldb.add(dep)
             ldb.commit()
 
-            # store the built site
             artifact_key = storage.put_site(project_id_safe, dep.id, files)
             base_url = get_base_url(request)
             url = f"{base_url}/sites/{project_slug}/index.html"
@@ -194,7 +199,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             dep.duration_ms = 1200
             ldb.commit()
 
-            # reload project in this session and update
             proj = ldb.query(Project).filter(Project.id == project_id_safe).first()
             if proj:
                 proj.status = "LIVE"
@@ -203,7 +207,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
                 proj.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 ldb.commit()
 
-            # save snapshot
             tree = storage.compute_tree(files)
             snap_id = secrets.token_urlsafe(12)
             storage.put_snapshot(project_id_safe, snap_id, files)
@@ -218,7 +221,6 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             ldb.add(snap)
             ldb.commit()
 
-            # assistant message
             assistant_content = f"已为你生成网站：{title}\n\n预览地址：{url}\n\n包含文件：{', '.join(files.keys())}"
             amsg = Message(id=secrets.token_urlsafe(12), project_id=project_id_safe,
                            role="assistant", content=assistant_content)
