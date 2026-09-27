@@ -1,6 +1,7 @@
 """Atom backend entrypoint: FastAPI app with auth, projects, static sites, and frontend."""
 import os
 import sys
+import time
 import signal
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from database import init_db, SessionLocal, Project, Deployment
+from database import init_db, SessionLocal, Project, Deployment, SiteFile, engine, DB_URL
 import auth_routes, project_routes
 import storage
 
@@ -40,30 +41,79 @@ def _init_timeout_handler(signum, frame):
     raise _InitTimeoutError("init_db timed out")
 
 
+def _safe_init_db(max_wait: float = 25.0) -> bool:
+    """Initialize the DB with retries. Returns True on success.
+
+    Neon Postgres cold start can take several seconds. We retry init_db
+    for up to ``max_wait`` seconds so the site_files table is reliably
+    created even on a cold start.
+    """
+    deadline = time.monotonic() + max_wait
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            per_attempt = min(10, int(remaining))
+            signal.signal(signal.SIGALRM, _init_timeout_handler)
+            signal.alarm(per_attempt)
+            init_db()
+            signal.alarm(0)
+            print(f"[atom] DB initialized on attempt {attempt}")
+            return True
+        except _InitTimeoutError:
+            signal.alarm(0)
+            print(f"[atom] init_db attempt {attempt} timed out, retrying…")
+            time.sleep(1)
+        except Exception as e:
+            signal.alarm(0)
+            print(f"[atom] init_db attempt {attempt} error: {e}")
+            time.sleep(1)
+        if time.monotonic() >= deadline:
+            break
+    print("[atom] init_db failed after retries; continuing without DB init")
+    return False
+
+
 @app.on_event("startup")
 def startup():
-    # Protect cold start from an unreachable/slow DB. Vercel serverless
-    # functions have limited time; don't let init_db hang forever.
-    try:
-        signal.signal(signal.SIGALRM, _init_timeout_handler)
-        signal.alarm(8)
-        init_db()
-        signal.alarm(0)
-        print("[atom] DB initialized")
-    except _InitTimeoutError:
-        print("[atom] init_db timed out (DB unreachable?), continuing")
-    except Exception as e:
-        print(f"[atom] init_db error: {e}")
-    finally:
-        try:
-            signal.alarm(0)
-        except Exception:
-            pass
+    _safe_init_db()
 
 
 @app.get("/api/health")
 def health():
     return {"ok": True, "version": "0.4.0"}
+
+
+@app.get("/api/storage-info")
+def storage_info():
+    """Diagnostic endpoint: report which storage backend is active and
+    whether the site_files table exists (so generated sites persist)."""
+    info = {
+        "db_scheme": "sqlite" if DB_URL.startswith("sqlite") else "postgres",
+        "db_persistent": not DB_URL.startswith("sqlite"),
+        "blob_enabled": storage.USE_BLOB,
+        "site_files_table_exists": False,
+        "site_file_count": 0,
+        "deployment_count": 0,
+    }
+    db = SessionLocal()
+    try:
+        from sqlalchemy import inspect, func
+        insp = inspect(engine)
+        info["site_files_table_exists"] = insp.has_table("site_files")
+        if info["site_files_table_exists"]:
+            info["site_file_count"] = db.query(func.count(SiteFile.id)).scalar() or 0
+        info["deployment_count"] = db.query(func.count(Deployment.id)).scalar() or 0
+        db_dep = db.query(Deployment).filter(Deployment.artifact_key.like("db:%")).first()
+        info["db_artifact_used"] = db_dep is not None
+    except Exception as e:
+        info["error"] = str(e)
+    finally:
+        db.close()
+    return info
 
 
 # ---------- Deployed static sites ----------
@@ -80,7 +130,6 @@ def _serve_site_file(slug: str, path: str):
         rel = path or "index.html"
         content = storage.get_site_file(dep.artifact_key, rel)
         if content is None:
-            # fallback to index.html for SPA routing
             content = storage.get_site_file(dep.artifact_key, "index.html")
             rel = "index.html"
         if content is None:
@@ -102,7 +151,6 @@ def serve_site_root(slug: str):
     return RedirectResponse(url=f"/sites/{slug}/index.html")
 
 
-# Vercel: /sites/* is rewritten to /api/sites/* so it reaches the serverless fn
 @app.get("/api/sites/{slug}/{path:path}")
 def serve_site_via_api(slug: str, path: str):
     return _serve_site_file(slug, path)
@@ -132,15 +180,12 @@ def _content_type(path: str) -> str:
 
 
 # ---------- Frontend SPA fallback ----------
-# On Vercel, static files are served by Vercel CDN; only /api/* and /sites/*
-# reach this FastAPI app. The SPA fallback only matters for local dev.
 FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists() and FRONTEND_DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 
     @app.get("/{full_path:path}")
     def spa(full_path: str):
-        # API and sites handled above; serve index.html for everything else
         index = FRONTEND_DIST / "index.html"
         if index.exists():
             return FileResponse(str(index))

@@ -29,9 +29,10 @@ _connect_args = {}
 if DB_URL.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}
 else:
-    # Postgres: limit connection time so a slow/unreachable DB doesn't hang
-    # the serverless function during cold start.
-    _connect_args = {"connect_timeout": 5}
+    # Postgres: limit connection time. Neon Postgres cold start can take
+    # several seconds; allow enough time so the connection succeeds rather
+    # than timing out and looking like "data disappeared".
+    _connect_args = {"connect_timeout": 25}
 
 engine = create_engine(
     DB_URL,
