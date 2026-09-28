@@ -32,6 +32,9 @@ Rules:
 - index.html must be self-contained but may reference styles.css and script.js.
 - Use modern CSS (flex/grid, gradients, animations). Mobile-first.
 - CRITICAL — keep the whole response SMALL: minify the HTML/CSS/JS (single-line, no indentation, no comments, no blank lines, minimal whitespace). Target under 3000 characters total. Implement only the features the user asked for, nothing extra. Fewer tokens = faster generation.
+- CRITICAL — data persistence: if the app manages user-entered data (tasks, notes, list items, counters), include EXACTLY this storage pattern (copy verbatim, replacing only the variable name and default value):
+  const KEY='app:'+location.pathname;let tasks=[];try{tasks=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){};
+  Then call localStorage.setItem(KEY,JSON.stringify(tasks)) after EVERY mutation (add/edit/delete/complete). Never keep user data only in JS variables — data must survive page refresh.
 - No placeholders like lorem ipsum — write real copy fitting the request.
 - No external CDN dependencies; inline SVGs/icons instead.
 - NEVER use <img src=\"...\"> with external URLs — they will break. Use CSS gradients, inline SVG, or colored divs for any visual/image placeholders.
@@ -96,6 +99,30 @@ def _try_fix_llm_json(s: str) -> str:
                 out.append(ch)
         i += 1
     return "".join(out)
+
+
+_STATIC_APP_KEY = re.compile(r"""\bKEY\s*=\s*(['"])app:(?!\1)(.+?)\1""")
+
+
+def _normalize_storage_key(files: dict) -> dict:
+    """Ensure generated apps persist under a per-site dynamic localStorage key.
+
+    The LLM often collapses the required dynamic key ``'app:'+location.pathname``
+    into a static string like ``'app:/tasks'``. Static keys leak data between
+    different projects served on the same domain, so rewrite any static
+    ``KEY='app:...'`` back to the dynamic expression. The correct dynamic
+    literal ``'app:'`` (empty suffix) is left untouched.
+    """
+    for path, content in files.items():
+        if not isinstance(content, str):
+            continue
+        if not (path.endswith((".js", ".html")) or "<script" in content):
+            continue
+        fixed = _STATIC_APP_KEY.sub(r"KEY='app:'+location.pathname", content)
+        if fixed != content:
+            files[path] = fixed
+            print(f"[agent] normalized static storage key in {path}")
+    return files
 
 
 async def generate_with_llm_stream(prompt: str):
@@ -208,6 +235,7 @@ async def generate_with_llm_stream(prompt: str):
             return
 
     if "files" in data and "index.html" in data["files"]:
+        _normalize_storage_key(data["files"])
         yield {"type": "done", "data": data}
         return
 
@@ -253,7 +281,7 @@ def _detect_type(prompt: str) -> str:
 
 
 def _extract_name(prompt: str) -> str:
-    m = re.search(r"[\"'‘'""]\"([^\"'‘'""]{2,30})[\"'‘'""]\"", prompt)
+    m = re.search(r"[\"'‘'"]\"([^\"'‘'"]{2,30})[\"'‘'"]\"", prompt)
     if m:
         return m.group(1)
     m = re.search(r"(?:我叫|my name is|called|名字是)\s*([A-Za-z\u4e00-\u9fa5]{2,20})", prompt, re.I)
