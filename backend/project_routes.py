@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Body
 from fastapi.responses import StreamingResponse, Response
+from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -141,37 +142,50 @@ class SendMessageIn(BaseModel):
 async def send_message(project_id: str, body: SendMessageIn, request: Request,
                        user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = _own_project(db, user, project_id)
+    # 对话任务提前入库：用户消息 + assistant 占位消息（content 为空表示
+    # "生成中"）。这样刷新页面 / SSE 断开后，历史记录依然完整可查。
     user_msg = Message(id=secrets.token_urlsafe(12), project_id=p.id, role="user", content=body.content)
     db.add(user_msg)
+    db.commit()
+    assistant_msg = Message(id=secrets.token_urlsafe(12), project_id=p.id, role="assistant", content="")
+    db.add(assistant_msg)
     db.commit()
     project_id_safe = p.id
     project_slug = p.slug
     project_name = p.name
     user_msg_id = user_msg.id
+    assistant_msg_id = assistant_msg.id
     db.close()
 
-    async def event_stream():
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def run_generation():
+        """完整生成 + 入库，与 SSE 连接解耦：客户端断开也不影响执行。"""
         from database import SessionLocal
         ldb = SessionLocal()
         try:
-            yield _sse("status", "正在为你生成网站…")
-            await asyncio.sleep(0.2)
+            await queue.put(("status", "正在为你生成网站…"))
 
             result = None
             async for evt in generate_site_stream(body.content):
                 etype = evt.get("type")
                 if etype == "llm_status":
-                    yield _sse("status", evt.get("message", ""))
+                    await queue.put(("status", evt.get("message", "")))
                 elif etype == "llm_reasoning":
-                    yield _sse("llm_reasoning", evt.get("content", ""))
+                    await queue.put(("llm_reasoning", evt.get("content", "")))
                 elif etype == "llm_error":
-                    yield _sse("llm_error", evt.get("error", ""))
+                    await queue.put(("llm_error", evt.get("error", "")))
                 elif etype == "done":
                     result = evt.get("data")
                     break
 
             if not result:
-                yield _sse("error", "生成失败：未获得有效结果")
+                err = "生成失败：未获得有效结果"
+                am = ldb.query(Message).filter(Message.id == assistant_msg_id).first()
+                if am is not None:
+                    am.content = err
+                    ldb.commit()
+                await queue.put(("error", err))
                 return
 
             title = result.get("title", project_name or "My Site")
@@ -179,7 +193,7 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             if "index.html" not in files:
                 files["index.html"] = "<html><body>Hello</body></html>"
 
-            yield _sse("status", f"生成完成：{title}")
+            await queue.put(("status", f"生成完成：{title}"))
 
             dep = Deployment(
                 id=secrets.token_urlsafe(12), project_id=project_id_safe,
@@ -220,23 +234,57 @@ async def send_message(project_id: str, body: SendMessageIn, request: Request,
             ldb.commit()
 
             assistant_content = f"已为你生成网站：{title}\n\n预览地址：{url}\n\n包含文件：{', '.join(files.keys())}"
-            amsg = Message(id=secrets.token_urlsafe(12), project_id=project_id_safe,
-                           role="assistant", content=assistant_content)
-            ldb.add(amsg)
-            ldb.commit()
+            am = ldb.query(Message).filter(Message.id == assistant_msg_id).first()
+            if am is not None:
+                am.content = assistant_content
+                ldb.commit()
 
-            yield _sse("assistant", assistant_content)
-            yield _sse("deployment", {"status": "LIVE", "url": url, "id": dep.id})
-            yield _sse("done", {"ok": True})
+            await queue.put(("assistant", assistant_content))
+            await queue.put(("deployment", {"status": "LIVE", "url": url, "id": dep.id}))
+            await queue.put(("done", {"ok": True}))
         except Exception as e:
-            print(f"[send_message] stream error: {e}")
+            print(f"[send_message] generation error: {e}")
             import traceback
             traceback.print_exc()
-            yield _sse("error", str(e))
+            try:
+                am = ldb.query(Message).filter(Message.id == assistant_msg_id).first()
+                if am is not None and not am.content:
+                    am.content = f"生成失败：{e}"
+                    ldb.commit()
+            except Exception:
+                pass
+            await queue.put(("error", str(e)))
         finally:
+            await queue.put(("__end__", None))
             ldb.close()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    gen_task = asyncio.create_task(run_generation())
+
+    async def event_stream():
+        # 只负责把生成进度转发给客户端；断开后 run_generation 照常执行。
+        while True:
+            try:
+                evt = await asyncio.wait_for(queue.get(), timeout=15)
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"  # 心跳，防止中间层空闲超时
+                continue
+            etype, data = evt
+            if etype == "__end__":
+                break
+            yield _sse(etype, data)
+
+    async def finish_generation():
+        # BackgroundTask 在响应结束后执行（serverless 冻结前）：
+        # 即使客户端已断开，也等生成任务跑完并入库。
+        try:
+            await gen_task
+        except Exception:
+            pass
+
+    return StreamingResponse(
+        event_stream(), media_type="text/event-stream",
+        background=BackgroundTask(finish_generation),
+    )
 
 
 def _sse(event: str, data) -> str:

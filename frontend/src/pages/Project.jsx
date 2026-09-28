@@ -40,6 +40,27 @@ export default function Project() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
+  // 存在"生成中"的占位消息（assistant 且 content 为空）时轮询恢复：
+  // 页面刷新 / SSE 断开后，后台生成完成后自动补全对话与预览。
+  const hasPendingAssistant = messages.some(m => m.role === 'assistant' && !m.content)
+  useEffect(() => {
+    if (!hasPendingAssistant) return
+    let tries = 0
+    const timer = setInterval(async () => {
+      tries += 1
+      try {
+        const msgs = await apiJson(`/api/projects/${id}/messages`)
+        setMessages(msgs)
+        if (!msgs.some(m => m.role === 'assistant' && !m.content)) {
+          const p = await apiJson(`/api/projects/${id}`).catch(() => null)
+          if (p) setProject(p)
+        }
+      } catch (e) {}
+      if (tries >= 45) clearInterval(timer) // ~3 分钟后停止轮询
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [hasPendingAssistant, id])
+
   async function send(e) {
     e?.preventDefault()
     const content = input.trim()
@@ -107,7 +128,13 @@ export default function Project() {
       setLlmThinking('')
     } catch (e) {
       if (e.name !== 'AbortError') {
-        setMessages(m => [...m, { id: 'e' + Date.now(), role: 'assistant', content: '出错了：' + (e.message || '未知错误') }])
+        // SSE 断开：生成仍在后台执行（占位消息已入库），重拉消息接管显示
+        try {
+          const msgs = await apiJson(`/api/projects/${id}/messages`)
+          setMessages(msgs)
+        } catch (e2) {
+          setMessages(m => [...m, { id: 'e' + Date.now(), role: 'assistant', content: '出错了：' + (e.message || '未知错误') }])
+        }
       }
     } finally {
       setSending(false)
@@ -152,7 +179,11 @@ export default function Project() {
               </div>
             )}
             {messages.map(m => (
-              <div key={m.id} className={`msg ${m.role}`}>{m.content}</div>
+              <div key={m.id} className={`msg ${m.role}`}>
+                {m.role === 'assistant' && !m.content
+                  ? '⏳ 网站正在生成中… 可以离开或刷新页面，稍后回来查看结果。'
+                  : m.content}
+              </div>
             ))}
           </div>
 
