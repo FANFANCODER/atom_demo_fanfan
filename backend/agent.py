@@ -31,9 +31,10 @@ Rules:
 - Produce a complete, beautiful, responsive single-page website.
 - index.html must be self-contained but may reference styles.css and script.js.
 - Use modern CSS (flex/grid, gradients, animations). Mobile-first.
+- CRITICAL — keep the whole response SMALL: minify the HTML/CSS/JS (single-line, no indentation, no comments, no blank lines, minimal whitespace). Target under 3000 characters total. Implement only the features the user asked for, nothing extra. Fewer tokens = faster generation.
 - No placeholders like lorem ipsum — write real copy fitting the request.
 - No external CDN dependencies; inline SVGs/icons instead.
-- NEVER use <img src="..."> with external URLs — they will break. Use CSS gradients, inline SVG, or colored divs for any visual/image placeholders.
+- NEVER use <img src=\"...\"> with external URLs — they will break. Use CSS gradients, inline SVG, or colored divs for any visual/image placeholders.
 - Layout rules (CRITICAL):
   * Headings and titles must NOT wrap character-by-character. Add white-space:nowrap to titles, or give the container enough min-width.
   * Use proper line breaks: separate sections with <section> or <div> blocks; use <br> only for intentional line breaks within a line.
@@ -49,6 +50,52 @@ def _strip_fences(content: str) -> str:
     content = re.sub(r"^```(?:json)?\s*", "", content)
     content = re.sub(r"\s*```$", "", content)
     return content.strip()
+
+
+def _try_fix_llm_json(s: str) -> str:
+    """Best-effort repair of LLM JSON that embeds raw HTML.
+
+    Typical failure: unescaped double quotes inside string values, e.g.
+    "index.html": "<div class="btn">..."  (should be class=\"btn\").
+    Heuristic: a '"' inside a string is treated as the string terminator
+    only when the next non-space char is a JSON structural char (,}]:),
+    otherwise it is escaped.
+    """
+    out = []
+    in_str = False
+    i = 0
+    n = len(s)
+    while i < n:
+        ch = s[i]
+        if not in_str:
+            if ch == '"':
+                in_str = True
+            out.append(ch)
+        else:
+            if ch == "\\" and i + 1 < n:
+                out.append(ch)
+                out.append(s[i + 1])
+                i += 2
+                continue
+            if ch == '"':
+                j = i + 1
+                while j < n and s[j] in " \t\r\n":
+                    j += 1
+                if j >= n or s[j] in ",}]:":
+                    in_str = False
+                    out.append(ch)
+                else:
+                    out.append('\\"')
+            elif ch == "\n":
+                out.append("\\n")
+            elif ch == "\r":
+                out.append("\\r")
+            elif ch == "\t":
+                out.append("\\t")
+            else:
+                out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 async def generate_with_llm_stream(prompt: str):
@@ -74,7 +121,7 @@ async def generate_with_llm_stream(prompt: str):
     full_content = ""
     full_reasoning = ""
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=52) as client:
             async with client.stream(
                 "POST",
                 f"{LLM_BASE_URL}/chat/completions",
@@ -85,8 +132,9 @@ async def generate_with_llm_stream(prompt: str):
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": 0.7,
+                    "temperature": 0.2,
                     "stream": True,
+                    "response_format": {"type": "json_object"},
                 },
             ) as resp:
                 if resp.status_code >= 400:
@@ -142,13 +190,22 @@ async def generate_with_llm_stream(prompt: str):
         return
 
     content_to_parse = _strip_fences(content_to_parse)
+    data = None
     try:
         data = json.loads(content_to_parse)
     except json.JSONDecodeError as e:
         print(f"[agent] LLM JSON parse failed: {e}; content[:200]={content_to_parse[:200]!r}")
-        yield {"type": "llm_error", "error": f"LLM 输出 JSON 解析失败: {e}"}
-        yield {"type": "done", "data": None}
-        return
+        # Retry after best-effort repair (LLM often leaves unescaped quotes
+        # inside embedded HTML, e.g. <div class="btn">).
+        try:
+            repaired = _try_fix_llm_json(content_to_parse)
+            data = json.loads(repaired)
+            print("[agent] LLM JSON repaired successfully")
+        except json.JSONDecodeError as e2:
+            print(f"[agent] LLM JSON repair failed too: {e2}")
+            yield {"type": "llm_error", "error": f"LLM 输出 JSON 解析失败: {e2}"}
+            yield {"type": "done", "data": None}
+            return
 
     if "files" in data and "index.html" in data["files"]:
         yield {"type": "done", "data": data}
@@ -196,7 +253,7 @@ def _detect_type(prompt: str) -> str:
 
 
 def _extract_name(prompt: str) -> str:
-    m = re.search(r"[\"'‘'\"\"]\"([^\"'‘'\"\"]{2,30})[\"'‘'\"\"]\"", prompt)
+    m = re.search(r"[\"'‘'""]\"([^\"'‘'""]{2,30})[\"'‘'""]\"", prompt)
     if m:
         return m.group(1)
     m = re.search(r"(?:我叫|my name is|called|名字是)\s*([A-Za-z\u4e00-\u9fa5]{2,20})", prompt, re.I)
