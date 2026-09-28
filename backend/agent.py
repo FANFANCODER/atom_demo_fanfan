@@ -101,24 +101,38 @@ def _try_fix_llm_json(s: str) -> str:
     return "".join(out)
 
 
-_STATIC_APP_KEY = re.compile(r"""\bKEY\s*=\s*(['"])app:(?!\1)(.+?)\1""")
+_STATIC_APP_KEY = re.compile(r"""\b([A-Za-z_$][\w$]*)\s*=\s*(['\"])app:(?!\2)(.+?)\2""")
+
+_LS_INLINE_KEY = re.compile(
+    r"""(localStorage\.(?:get|set|remove)Item\(\s*)(['\"])([^'\"]+)\2"""
+)
+
+
+def _inline_key_sub(m) -> str:
+    key = m.group(3)
+    if key == "app:":
+        # Dynamic-concat prefix literal ('app:'+location.pathname) — keep.
+        return m.group(0)
+    suffix = key[4:] if key.startswith("app:") else key
+    return f"{m.group(1)}'app:'+location.pathname+':{suffix}'"
 
 
 def _normalize_storage_key(files: dict) -> dict:
     """Ensure generated apps persist under a per-site dynamic localStorage key.
 
     The LLM often collapses the required dynamic key ``'app:'+location.pathname``
-    into a static string like ``'app:/tasks'``. Static keys leak data between
-    different projects served on the same domain, so rewrite any static
-    ``KEY='app:...'`` back to the dynamic expression. The correct dynamic
-    literal ``'app:'`` (empty suffix) is left untouched.
+    into a static string like ``'app:/tasks'``, uses an arbitrary variable
+    name, or inlines a static key (``localStorage.setItem('tasks', ...)``).
+    Static keys leak data between different projects served on the same
+    domain, so rewrite every static form back to a pathname-scoped key.
     """
     for path, content in files.items():
         if not isinstance(content, str):
             continue
         if not (path.endswith((".js", ".html")) or "<script" in content):
             continue
-        fixed = _STATIC_APP_KEY.sub(r"KEY='app:'+location.pathname", content)
+        fixed = _STATIC_APP_KEY.sub(r"\1='app:'+location.pathname", content)
+        fixed = _LS_INLINE_KEY.sub(_inline_key_sub, fixed)
         if fixed != content:
             files[path] = fixed
             print(f"[agent] normalized static storage key in {path}")
@@ -281,7 +295,7 @@ def _detect_type(prompt: str) -> str:
 
 
 def _extract_name(prompt: str) -> str:
-    m = re.search(r"[\"'‘'"]\"([^\"'‘'"]{2,30})[\"'‘'"]\"", prompt)
+    m = re.search(r"[\"'‘’“”]([^\"'‘’“”]{2,30})[\"'‘’“”]", prompt)
     if m:
         return m.group(1)
     m = re.search(r"(?:我叫|my name is|called|名字是)\s*([A-Za-z\u4e00-\u9fa5]{2,20})", prompt, re.I)
