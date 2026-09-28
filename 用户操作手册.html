@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Atom 用户操作手册</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.7; padding: 32px 20px; }
+  .wrap { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(15,23,42,.06); padding: 40px 48px; }
+  h1 { font-size: 30px; margin-bottom: 6px; text-align: center; color: #1e293b; }
+  .subtitle { text-align: center; color: #64748b; margin-bottom: 32px; font-size: 14px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; }
+
+  /* TOC */
+  .toc { background: #f1f5f9; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
+  .toc h3 { font-size: 15px; margin-bottom: 10px; color: #334155; }
+  .toc ol { padding-left: 22px; }
+  .toc li { margin: 4px 0; font-size: 14px; }
+  .toc a { color: #4f46e5; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  h2 { font-size: 22px; color: #1e293b; margin: 36px 0 14px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; scroll-margin-top: 20px; }
+  h3 { font-size: 17px; color: #334155; margin: 22px 0 10px; }
+  p { color: #475569; margin: 10px 0; font-size: 14.5px; }
+
+  ul, ol { padding-left: 24px; margin: 10px 0; color: #475569; font-size: 14.5px; }
+  li { margin: 6px 0; }
+
+  .step-card { background: #f8fafc; border-left: 4px solid #4f46e5; border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
+  .step-card b { color: #4f46e5; }
+
+  .tip { background: #ecfdf5; border-left: 4px solid #10b981; border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 14px; color: #065f46; }
+  .tip b { color: #047857; }
+
+  .warn { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 14px; color: #92400e; }
+  .warn b { color: #b45309; }
+
+  .danger { background: #fef2f2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 14px; color: #991b1b; }
+
+  code { background: #f1f5f9; padding: 2px 7px; border-radius: 4px; font-size: 13px; color: #be185d; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .screenshot-placeholder { background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 28px; text-align: center; color: #94a3b8; font-size: 13px; margin: 14px 0; }
+
+  .kbd { background: #fff; border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 5px; padding: 1px 7px; font-size: 12px; color: #334155; font-family: inherit; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 14px 0; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+  th { background: #f8fafc; font-weight: 600; color: #334155; }
+  td { color: #475569; }
+
+  .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Atom 用户操作手册</h1>
+  <p class="subtitle">AI 对话式网站生成器 · 用一句话，搭建你的网站 · v0.4.0</p>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>📖 目录</h3>
+    <ol>
+      <li><a href="#intro">产品简介</a></li>
+      <li><a href="#register">注册与登录</a></li>
+      <li><a href="#create">创建你的第一个网站</a></li>
+      <li><a href="#chat">聊天界面与实时预览</a></li>
+      <li><a href="#prompt">如何写出好的提示词</a></li>
+      <li><a href="#manage">项目管理</a></li>
+      <li><a href="#settings">账号设置</a></li>
+      <li><a href="#faq">常见问题</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. Intro -->
+  <h2 id="intro">1. 产品简介</h2>
+  <p><b>Atom</b> 是一款 AI 对话式网站生成器。你只需用自然语言描述想要的网站，Atom 就会调用大模型自动生成一个完整、美观、可直接访问的静态网站，并在浏览器中实时预览。</p>
+  <ul>
+    <li>✨ <b>零代码门槛</b>：不需要任何编程知识，用中文描述即可。</li>
+    <li>⚡ <b>实时生成</b>：边思考边生成，几秒内得到可访问的网站。</li>
+    <li>🎨 <b>美观现代</b>：采用响应式设计，手机电脑都好看。</li>
+    <li>🔐 <b>账号隔离</b>：每个用户的项目独立存储，安全私密。</li>
+  </ul>
+
+  <!-- 2. Register -->
+  <h2 id="register">2. 注册与登录</h2>
+  <h3>2.1 注册账号</h3>
+  <ol>
+    <li>打开 Atom 网站，进入 <b>注册</b> 页面。</li>
+    <li>输入你的 <b>邮箱</b>（用于登录）。</li>
+    <li>设置 <b>密码</b>（至少 8 位字符）。</li>
+    <li>点击「注册」按钮，系统会自动创建账号并登录。</li>
+  </ol>
+  <div class="warn"><b>⚠️ 注意：</b>同一邮箱只能注册一个账号。注册接口有速率限制，请勿频繁尝试。</div>
+
+  <h3>2.2 登录</h3>
+  <ol>
+    <li>在登录页面输入注册时的 <b>邮箱</b> 和 <b>密码</b>。</li>
+    <li>可勾选「记住我」延长登录状态（默认 30 天）。</li>
+    <li>点击「登录」进入工作台。</li>
+  </ol>
+  <div class="tip"><b>💡 免登录模式：</b>如果平台开启了访客模式（<code>ATOM_DISABLE_AUTH=1</code>），你无需注册即可直接使用，所有操作以访客身份进行。</div>
+
+  <!-- 3. Create -->
+  <h2 id="create">3. 创建你的第一个网站</h2>
+  <p>登录后自动进入<b>工作台</b>。Atom 采用「对话即创建」的方式——你不需要点「新建项目」按钮，直接在输入框描述需求即可。</p>
+
+  <div class="step-card">
+    <b>步骤 1：</b>在工作台顶部的输入框中，用一句话描述你想要的网站。<br>
+    例如：<code>做个个人主页，我叫 Alice，喜欢摄影和旅行</code>
+  </div>
+  <div class="step-card">
+    <b>步骤 2：</b>按 <span class="kbd">Enter</span> 或点击「生成 →」按钮。
+  </div>
+  <div class="step-card">
+    <b>步骤 3：</b>系统自动创建项目并跳转到项目页，AI 开始生成网站。
+  </div>
+
+  <div class="tip"><b>💡 提示：</b>描述越具体，生成的网站越符合你的预期。可以包含姓名、主题、风格、颜色偏好等信息。</div>
+
+  <!-- 4. Chat -->
+  <h2 id="chat">4. 聊天界面与实时预览</h2>
+  <p>项目页分为左右两栏：</p>
+
+  <table>
+    <thead><tr><th>区域</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><b>左侧 · 聊天区</b></td><td>与 AI 对话，发送需求、查看状态、阅读思考过程</td></tr>
+      <tr><td><b>右侧 · 预览区</b></td><td>实时显示生成的网站，iframe 内嵌预览</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.1 发送消息</h3>
+  <ul>
+    <li>在底部输入框输入你的需求或修改要求。</li>
+    <li>按 <span class="kbd">Enter</span> 发送（<span class="kbd">Shift</span>+<span class="kbd">Enter</span> 换行）。</li>
+    <li>发送后消息会立即出现在聊天区，AI 开始处理。</li>
+  </ul>
+
+  <h3>4.2 查看 AI 思考过程</h3>
+  <p>在 AI 生成过程中，聊天区下方会显示一个<b>「🧠 模型思考过程」</b>面板，实时展示 AI 的推理思路。这是有意义的文字内容，帮助你理解 AI 是如何设计网站的。</p>
+  <div class="tip"><b>💡 说明：</b>Atom 不会向你展示大模型输出的原始代码（HTML/CSS/JSON），只展示思考过程，让界面保持干净易读。</div>
+
+  <h3>4.3 实时预览</h3>
+  <ul>
+    <li>网站生成完成后，右侧预览区会自动加载你的网站。</li>
+    <li>点击预览区右上角的<b>「新窗口打开」</b>，可在浏览器新标签页中查看完整网站。</li>
+    <li>你可以在预览区内直接点击链接、滚动页面，体验完整功能。</li>
+  </ul>
+
+  <h3>4.4 迭代修改</h3>
+  <p>如果对生成结果不满意，直接在聊天框继续描述你的修改要求即可。例如：</p>
+  <ul>
+    <li><code>把主题色改成绿色</code></li>
+    <li><code>加一个作品集板块</code></li>
+    <li><code>把字体调大一点，增加一个联系表单</code></li>
+  </ul>
+  <p>AI 会基于现有网站进行修改，并重新部署预览。</p>
+
+  <!-- 5. Prompt tips -->
+  <h2 id="prompt">5. 如何写出好的提示词</h2>
+  <p>好的提示词能让 AI 生成更符合你预期的网站。以下是一些建议：</p>
+
+  <h3>✅ 推荐做法</h3>
+  <ul>
+    <li><b>明确网站类型</b>：个人主页、产品落地页、博客、餐厅菜单、商城等。</li>
+    <li><b>包含关键信息</b>：姓名、品牌名、主营内容、联系方式等。</li>
+    <li><b>描述风格偏好</b>：简约、科技感、温暖、复古、暗黑模式等。</li>
+    <li><b>指定颜色</b>：主色调、辅助色（如「以蓝色为主，搭配橙色」）。</li>
+    <li><b>列举板块</b>：导航栏、英雄区、关于我、作品集、联系表单等。</li>
+  </ul>
+
+  <h3>❌ 避免</h3>
+  <ul>
+    <li>过于简短模糊：<code>做个网站</code>（AI 不知道你要什么）</li>
+    <li>要求动态后端功能：<code>做个可以注册登录的论坛</code>（Atom 生成静态网站，不支持后端数据库）</li>
+    <li>引用外部图片：<code>用这张图片做背景</code>（无法访问你的本地图片，AI 会用渐变/SVG 替代）</li>
+  </ul>
+
+  <h3>📝 优质提示词示例</h3>
+  <div class="screenshot-placeholder">
+    「做一个摄影师的个人作品集网站，我叫小林，主色调用深绿和米白，要有英雄区、作品集网格、关于我和联系方式四个板块，风格简约高级。」
+  </div>
+
+  <!-- 6. Manage -->
+  <h2 id="manage">6. 项目管理</h2>
+
+  <h3>6.1 查看项目列表</h3>
+  <p>在<b>工作台</b>页面，下方「我的项目」区域会以卡片形式展示你所有的项目。每张卡片显示项目名称、状态和最后更新时间。点击任意卡片即可进入该项目的聊天页。</p>
+
+  <h3>6.2 删除项目</h3>
+  <ol>
+    <li>进入要删除的项目页。</li>
+    <li>点击顶部导航栏的<b>「删除项目」</b>按钮。</li>
+    <li>在确认弹窗中点击「确定」。</li>
+  </ol>
+  <div class="danger"><b>⚠️ 不可逆操作：</b>删除项目后，该项目的所有对话记录、生成的网站和文件快照将被永久删除，无法恢复。请谨慎操作。</div>
+
+  <!-- 7. Settings -->
+  <h2 id="settings">7. 账号设置</h2>
+  <p>点击工作台右上角的<b>「设置」</b>进入设置页面。</p>
+
+  <h3>7.1 修改密码</h3>
+  <ol>
+    <li>输入<b>当前密码</b>。</li>
+    <li>输入<b>新密码</b>（至少 8 位）。</li>
+    <li>点击「修改密码」。</li>
+  </ol>
+  <div class="tip"><b>💡 安全提示：</b>修改密码后，其他设备上的登录会话会被自动下线，只有当前设备保持登录。</div>
+
+  <h3>7.2 登出</h3>
+  <p>点击<b>「登出当前设备」</b>，可退出当前浏览器的登录状态。你也可以在工作台右上角点击「退出」。</p>
+
+  <h3>7.3 删除账号</h3>
+  <ol>
+    <li>在设置页底部「危险操作」区域，点击<b>「删除账号」</b>。</li>
+    <li>确认弹窗提示后，账号及其所有项目、对话、数据将被永久删除。</li>
+  </ol>
+  <div class="danger"><b>⚠️ 高危操作：</b>删除账号不可恢复，所有数据将被清除。请确保已备份重要内容。</div>
+
+  <!-- 8. FAQ -->
+  <h2 id="faq">8. 常见问题</h2>
+
+  <h3>Q1：生成的网站可以自定义域名吗？</h3>
+  <p>当前版本生成的网站通过平台分配的 URL（<code>/sites/{slug}/index.html</code>）访问。如需绑定自定义域名，需在部署平台（如 Vercel）中配置。</p>
+
+  <h3>Q2：为什么有时显示「使用内置模板生成」？</h3>
+  <p>当平台未配置大模型 API Key 或大模型调用失败时，Atom 会自动使用内置模板生成网站。模板支持个人主页、产品落地页、商城、博客、餐厅等常见类型，同样美观可用。</p>
+
+  <h3>Q3：生成的网站支持哪些功能？</h3>
+  <p>Atom 生成的是<b>静态网站</b>（HTML + CSS + JS），支持：</p>
+  <ul>
+    <li>响应式布局（手机/平板/电脑自适应）</li>
+    <li>交互动画、悬停效果</li>
+    <li>表单（前端展示，提交需自行对接后端）</li>
+    <li>内联 SVG 图标（不依赖外部 CDN）</li>
+  </ul>
+  <p>不支持需要后端的功能，如用户注册登录、数据库读写、支付等。</p>
+
+  <h3>Q4：预览区显示空白或「Not Found」怎么办？</h3>
+  <p>可能原因及解决方法：</p>
+  <ul>
+    <li>生成尚未完成：等待 AI 处理完毕，状态会变为「已就绪」。</li>
+    <li>网络延迟：刷新页面或点击「新窗口打开」重试。</li>
+    <li>存储异常：如果持续出现，可能是平台存储服务异常，请联系管理员。</li>
+  </ul>
+
+  <h3>Q5：我的网站数据安全吗？</h3>
+  <p>Atom 采用以下安全措施：</p>
+  <ul>
+    <li>密码使用 Argon2 算法哈希存储，不可逆。</li>
+    <li>登录会话使用 HttpOnly Cookie，防止 XSS 窃取。</li>
+    <li>用户间数据完全隔离，只能访问自己的项目。</li>
+    <li>登录/注册接口有速率限制，防止暴力破解。</li>
+  </ul>
+
+  <h3>Q6：可以导出生成的网站代码吗？</h3>
+  <p>当前版本可通过「新窗口打开」查看网站，右键查看源码即可获取 HTML。项目文件快照以 tar.gz 格式存储在服务端，可通过 API 接口下载。</p>
+
+  <div class="footer">
+    Atom v0.4.0 · AI 对话式网站生成器<br>
+    本手册适用于当前版本，如有功能更新请以实际界面为准。
+  </div>
+
+</div>
+</body>
+</html>

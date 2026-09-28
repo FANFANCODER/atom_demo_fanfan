@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Atom 系统架构图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; padding: 32px 20px; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 6px; text-align: center; }
+  .subtitle { text-align: center; color: #64748b; margin-bottom: 28px; font-size: 14px; }
+  .legend { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; font-size: 13px; color: #475569; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* SVG diagram */
+  svg { width: 100%; height: auto; display: block; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(15,23,42,.06); }
+
+  .layer-rect { rx: 14; }
+  .layer-label { font-size: 15px; font-weight: 700; fill: #fff; }
+  .layer-sub { font-size: 11px; fill: rgba(255,255,255,.8); }
+
+  .node { rx: 10; }
+  .node-title { font-size: 13px; font-weight: 700; }
+  .node-sub { font-size: 10.5px; fill: #64748b; }
+
+  .flow-label { font-size: 11px; fill: #475569; font-weight: 600; }
+
+  .section { margin-top: 32px; background: #fff; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 24px rgba(15,23,42,.06); }
+  .section h2 { font-size: 18px; margin-bottom: 14px; color: #1e293b; }
+  .flow-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .step { background: #f1f5f9; border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.6; color: #334155; position: relative; }
+  .step .num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #4f46e5; color: #fff; font-weight: 700; font-size: 12px; margin-right: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+  th { background: #f8fafc; font-weight: 600; color: #334155; }
+  td { color: #475569; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #be185d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Atom 系统架构图</h1>
+  <p class="subtitle">v0.4.0 · AI 对话式网站生成器 · React + FastAPI + Vercel</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#6366f1"></span>前端展示层</span>
+    <span><span class="dot" style="background:#0ea5e9"></span>API 网关层</span>
+    <span><span class="dot" style="background:#10b981"></span>核心服务层</span>
+    <span><span class="dot" style="background:#f59e0b"></span>数据存储层</span>
+    <span><span class="dot" style="background:#ef4444"></span>外部服务</span>
+  </div>
+
+  <!-- SVG Architecture Diagram -->
+  <svg viewBox="0 0 1180 920" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#94a3b8"/>
+      </marker>
+      <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#ef4444"/>
+      </marker>
+      <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" fill="#10b981"/>
+      </marker>
+      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#818cf8"/><stop offset="1" stop-color="#6366f1"/>
+      </linearGradient>
+      <linearGradient id="g2" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#0ea5e9"/>
+      </linearGradient>
+      <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#10b981"/>
+      </linearGradient>
+      <linearGradient id="g4" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f59e0b"/>
+      </linearGradient>
+      <linearGradient id="g5" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#f87171"/><stop offset="1" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <!-- ===== Layer 1: Frontend ===== -->
+    <rect class="layer-rect" x="20" y="20" width="1140" height="140" fill="url(#g1)" opacity="0.12"/>
+    <rect class="layer-rect" x="20" y="20" width="1140" height="34" fill="url(#g1)"/>
+    <text x="36" y="42" class="layer-label">① 前端展示层（React SPA · Vite 构建）</text>
+
+    <!-- Login / Register -->
+    <rect class="node" x="40" y="68" width="150" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="115" y="92" text-anchor="middle" class="node-title" fill="#4338ca">登录 / 注册</text>
+    <text x="115" y="110" text-anchor="middle" class="node-sub">Login.jsx</text>
+    <text x="115" y="124" text-anchor="middle" class="node-sub">Register.jsx</text>
+
+    <!-- Dashboard -->
+    <rect class="node" x="210" y="68" width="160" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="290" y="92" text-anchor="middle" class="node-title" fill="#4338ca">工作台</text>
+    <text x="290" y="110" text-anchor="middle" class="node-sub">Dashboard.jsx</text>
+    <text x="290" y="124" text-anchor="middle" class="node-sub">项目列表 + 创建入口</text>
+
+    <!-- Project (chat + preview) -->
+    <rect class="node" x="390" y="68" width="180" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="480" y="92" text-anchor="middle" class="node-title" fill="#4338ca">项目页（核心）</text>
+    <text x="480" y="110" text-anchor="middle" class="node-sub">Project.jsx</text>
+    <text x="480" y="124" text-anchor="middle" class="node-sub">SSE 聊天 + 实时预览 iframe</text>
+
+    <!-- Settings -->
+    <rect class="node" x="590" y="68" width="140" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="660" y="92" text-anchor="middle" class="node-title" fill="#4338ca">设置</text>
+    <text x="660" y="110" text-anchor="middle" class="node-sub">Settings.jsx</text>
+    <text x="660" y="124" text-anchor="middle" class="node-sub">密码 / 登出 / 删号</text>
+
+    <!-- api.js + Router -->
+    <rect class="node" x="750" y="68" width="170" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="835" y="92" text-anchor="middle" class="node-title" fill="#4338ca">API 客户端</text>
+    <text x="835" y="110" text-anchor="middle" class="node-sub">api.js（fetch 封装）</text>
+    <text x="835" y="124" text-anchor="middle" class="node-sub">React Router 路由</text>
+
+    <!-- Browser preview iframe -->
+    <rect class="node" x="940" y="68" width="200" height="76" fill="#fff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="1040" y="92" text-anchor="middle" class="node-title" fill="#4338ca">浏览器预览</text>
+    <text x="1040" y="110" text-anchor="middle" class="node-sub">iframe → /sites/{slug}/</text>
+    <text x="1040" y="124" text-anchor="middle" class="node-sub">Cookie 会话（sid）</text>
+
+    <!-- ===== Layer 2: API Gateway ===== -->
+    <rect class="layer-rect" x="20" y="180" width="1140" height="120" fill="url(#g2)" opacity="0.12"/>
+    <rect class="layer-rect" x="20" y="180" width="1140" height="34" fill="url(#g2)"/>
+    <text x="36" y="202" class="layer-label">② API 网关层（FastAPI · Vercel Serverless）</text>
+
+    <!-- Auth routes -->
+    <rect class="node" x="40" y="228" width="200" height="58" fill="#fff" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="140" y="250" text-anchor="middle" class="node-title" fill="#0369a1">认证路由 auth_routes</text>
+    <text x="140" y="268" text-anchor="middle" class="node-sub">/register · /login · /logout · /me · /change-password</text>
+
+    <!-- Project routes -->
+    <rect class="node" x="260" y="228" width="280" height="58" fill="#fff" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="400" y="250" text-anchor="middle" class="node-title" fill="#0369a1">项目路由 project_routes</text>
+    <text x="400" y="268" text-anchor="middle" class="node-sub">CRUD · /messages (SSE) · /files · /snapshots · /redeploy</text>
+
+    <!-- Static site serving -->
+    <rect class="node" x="560" y="228" width="220" height="58" fill="#fff" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="670" y="250" text-anchor="middle" class="node-title" fill="#0369a1">静态站点服务</text>
+    <text x="670" y="268" text-anchor="middle" class="node-sub">/sites/{slug} → SiteFile/Blob 读取</text>
+
+    <!-- Diagnostics -->
+    <rect class="node" x="800" y="228" width="180" height="58" fill="#fff" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="890" y="250" text-anchor="middle" class="node-title" fill="#0369a1">诊断接口</text>
+    <text x="890" y="268" text-anchor="middle" class="node-sub">/api/health · /api/storage-info</text>
+
+    <!-- SPA fallback -->
+    <rect class="node" x="1000" y="228" width="140" height="58" fill="#fff" stroke="#bae6fd" stroke-width="1.5"/>
+    <text x="1070" y="250" text-anchor="middle" class="node-title" fill="#0369a1">SPA 回退</text>
+    <text x="1070" y="268" text-anchor="middle" class="node-sub">/{path} → index.html</text>
+
+    <!-- arrows L1 -> L2 -->
+    <line x1="480" y1="144" x2="480" y2="228" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="1040" y1="144" x2="670" y2="228" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+    <text x="780" y="190" class="flow-label" fill="#0369a1">SSE 流式</text>
+    <text x="1060" y="190" class="flow-label" fill="#0369a1">HTTP GET</text>
+
+    <!-- ===== Layer 3: Core Services ===== -->
+    <rect class="layer-rect" x="20" y="320" width="1140" height="150" fill="url(#g3)" opacity="0.12"/>
+    <rect class="layer-rect" x="20" y="320" width="1140" height="34" fill="url(#g3)"/>
+    <text x="36" y="342" class="layer-label">③ 核心服务层</text>
+
+    <!-- Auth service -->
+    <rect class="node" x="40" y="368" width="220" height="88" fill="#fff" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="150" y="390" text-anchor="middle" class="node-title" fill="#047857">认证服务 auth.py</text>
+    <text x="150" y="408" text-anchor="middle" class="node-sub">· Session Cookie（sid, 30天）</text>
+    <text x="150" y="422" text-anchor="middle" class="node-sub">· Argon2 密码哈希</text>
+    <text x="150" y="436" text-anchor="middle" class="node-sub">· 限流 · 免登录模式（ATOM_DISABLE_AUTH）</text>
+
+    <!-- Agent -->
+    <rect class="node" x="280" y="368" width="300" height="88" fill="#fff" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="430" y="390" text-anchor="middle" class="node-title" fill="#047857">AI Agent agent.py</text>
+    <text x="430" y="408" text-anchor="middle" class="node-sub">· LLM 流式调用（OpenAI 兼容协议）</text>
+    <text x="430" y="422" text-anchor="middle" class="node-sub">· 只推送 reasoning 思考过程，不推代码</text>
+    <text x="430" y="436" text-anchor="middle" class="node-sub">· 模板兜底（5 种类型：portfolio/shop/blog...）</text>
+
+    <!-- Storage -->
+    <rect class="node" x="600" y="368" width="280" height="88" fill="#fff" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="740" y="390" text-anchor="middle" class="node-title" fill="#047857">存储抽象 storage.py</text>
+    <text x="740" y="408" text-anchor="middle" class="node-sub">· put_site / get_site_file</text>
+    <text x="740" y="422" text-anchor="middle" class="node-sub">· put_snapshot / get_snapshot (tar.gz)</text>
+    <text x="740" y="436" text-anchor="middle" class="node-sub">· 三级回退：Blob → DB → 本地</text>
+
+    <!-- DB init -->
+    <rect class="node" x="900" y="368" width="240" height="88" fill="#fff" stroke="#a7f3d0" stroke-width="1.5"/>
+    <text x="1020" y="390" text-anchor="middle" class="node-title" fill="#047857">数据库 database.py</text>
+    <text x="1020" y="408" text-anchor="middle" class="node-sub">· SQLAlchemy 2.0 ORM</text>
+    <text x="1020" y="422" text-anchor="middle" class="node-sub">· init_db 带重试（Neon 冷启动）</text>
+    <text x="1020" y="436" text-anchor="middle" class="node-sub">· SQLite 本地 / Postgres 线上</text>
+
+    <!-- arrows L2 -> L3 -->
+    <line x1="140" y1="286" x2="150" y2="368" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="400" y1="286" x2="430" y2="368" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="670" y1="286" x2="740" y2="368" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+    <!-- ===== Layer 4: Data Models ===== -->
+    <rect class="layer-rect" x="20" y="490" width="1140" height="120" fill="url(#g4)" opacity="0.12"/>
+    <rect class="layer-rect" x="20" y="490" width="1140" height="34" fill="url(#g4)"/>
+    <text x="36" y="512" class="layer-label">④ 数据模型层（SQLAlchemy Models）</text>
+
+    <!-- User -->
+    <rect class="node" x="40" y="538" width="130" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="105" y="560" text-anchor="middle" class="node-title" fill="#b45309">User</text>
+    <text x="105" y="578" text-anchor="middle" class="node-sub">用户账号</text>
+
+    <!-- Session -->
+    <rect class="node" x="185" y="538" width="130" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="250" y="560" text-anchor="middle" class="node-title" fill="#b45309">Session</text>
+    <text x="250" y="578" text-anchor="middle" class="node-sub">登录会话</text>
+
+    <!-- Project -->
+    <rect class="node" x="330" y="538" width="130" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="395" y="560" text-anchor="middle" class="node-title" fill="#b45309">Project</text>
+    <text x="395" y="578" text-anchor="middle" class="node-sub">网站项目</text>
+
+    <!-- Message -->
+    <rect class="node" x="475" y="538" width="130" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="540" y="560" text-anchor="middle" class="node-title" fill="#b45309">Message</text>
+    <text x="540" y="578" text-anchor="middle" class="node-sub">聊天消息</text>
+
+    <!-- FileSnapshot -->
+    <rect class="node" x="620" y="538" width="140" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="690" y="560" text-anchor="middle" class="node-title" fill="#b45309">FileSnapshot</text>
+    <text x="690" y="578" text-anchor="middle" class="node-sub">文件快照（tar.gz）</text>
+
+    <!-- Deployment -->
+    <rect class="node" x="775" y="538" width="140" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="845" y="560" text-anchor="middle" class="node-title" fill="#b45309">Deployment</text>
+    <text x="845" y="578" text-anchor="middle" class="node-sub">部署记录</text>
+
+    <!-- SiteFile -->
+    <rect class="node" x="930" y="538" width="130" height="58" fill="#fff" stroke="#fde68a" stroke-width="1.5"/>
+    <text x="995" y="560" text-anchor="middle" class="node-title" fill="#b45309">SiteFile</text>
+    <text x="995" y="578" text-anchor="middle" class="node-sub">站点文件（base64）</text>
+
+    <!-- arrows L3 -> L4 -->
+    <line x1="150" y1="456" x2="105" y2="538" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <line x1="150" y1="456" x2="250" y2="538" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+    <line x1="1020" y1="456" x2="395" y2="538" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+    <!-- ===== Layer 5: External Services ===== -->
+    <rect class="layer-rect" x="20" y="630" width="1140" height="110" fill="url(#g5)" opacity="0.12"/>
+    <rect class="layer-rect" x="20" y="630" width="1140" height="34" fill="url(#g5)"/>
+    <text x="36" y="652" class="layer-label">⑤ 外部服务 / 基础设施</text>
+
+    <!-- LLM -->
+    <rect class="node" x="60" y="678" width="240" height="50" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+    <text x="180" y="700" text-anchor="middle" class="node-title" fill="#b91c1c">大模型 LLM</text>
+    <text x="180" y="716" text-anchor="middle" class="node-sub">GLM-4-Flash / OpenAI 兼容（流式 SSE）</text>
+
+    <!-- Vercel Blob -->
+    <rect class="node" x="340" y="678" width="240" height="50" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+    <text x="460" y="700" text-anchor="middle" class="node-title" fill="#b91c1c">Vercel Blob</text>
+    <text x="460" y="716" text-anchor="middle" class="node-sub">对象存储（BLOB_READ_WRITE_TOKEN）</text>
+
+    <!-- Neon Postgres -->
+    <rect class="node" x="620" y="678" width="260" height="50" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+    <text x="750" y="700" text-anchor="middle" class="node-title" fill="#b91c1c">Neon Postgres</text>
+    <text x="750" y="716" text-anchor="middle" class="node-sub">关系数据库（DATABASE_URL / POSTGRES_URL）</text>
+
+    <!-- Vercel Platform -->
+    <rect class="node" x="920" y="678" width="220" height="50" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+    <text x="1030" y="700" text-anchor="middle" class="node-title" fill="#b91c1c">Vercel 平台</text>
+    <text x="1030" y="716" text-anchor="middle" class="node-sub">Serverless 部署 + CDN</text>
+
+    <!-- arrows L3 -> L5 -->
+    <line x1="430" y1="456" x2="180" y2="678" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-red)"/>
+    <text x="280" y="570" class="flow-label" fill="#b91c1c">HTTPS 流式</text>
+
+    <line x1="740" y1="456" x2="460" y2="678" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="560" y="575" class="flow-label">优先</text>
+
+    <line x1="740" y1="456" x2="750" y2="678" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrow-green)"/>
+    <text x="730" y="575" class="flow-label" fill="#047857">回退存储</text>
+
+    <line x1="1020" y1="456" x2="750" y2="678" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+    <!-- ===== Data Flow annotation ===== -->
+    <g transform="translate(20, 760)">
+      <rect x="0" y="0" width="1140" height="150" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="24" y="30" style="font-size:15px;font-weight:700;fill:#1e293b">🔄 网站生成核心数据流</text>
+
+      <g font-size="11.5" fill="#334155">
+        <text x="24" y="56">① 用户在聊天框输入描述 → POST <tspan fill="#be185d">/api/projects/{id}/messages</tspan></text>
+        <text x="24" y="76">② 后端调用 <tspan fill="#047857">generate_site_stream()</tspan> → LLM 流式返回 reasoning（思考过程）+ content（JSON 代码）</text>
+        <text x="24" y="96">③ 前端 SSE 接收 <tspan fill="#047857">llm_reasoning</tspan> 事件实时展示思考过程（不展示代码）</text>
+        <text x="24" y="116">④ 解析 JSON 得到 <tspan fill="#be185d">{title, files:{index.html, ...}}</tspan> → storage.put_site() 存入 Blob/DB</text>
+        <text x="24" y="136">⑤ 创建 Deployment 记录 → SSE 返回 <tspan fill="#047857">deployment</tspan> 事件 → iframe 加载 <tspan fill="#be185d">/sites/{slug}/index.html</tspan> 实时预览</text>
+      </g>
+    </g>
+  </svg>
+
+  <!-- Environment Variables -->
+  <div class="section">
+    <h2>⚙️ 环境变量配置</h2>
+    <table>
+      <thead><tr><th>变量名</th><th>说明</th><th>示例</th></tr></thead>
+      <tbody>
+        <tr><td><code>DATABASE_URL</code> / <code>POSTGRES_URL</code></td><td>数据库连接串（Neon Postgres），本地不设则用 SQLite</td><td><code>postgresql://user:pass@host/db</code></td></tr>
+        <tr><td><code>OPENAI_API_KEY</code></td><td>LLM API Key（不设则用内置模板兜底）</td><td><code>c34d...kzdj</code></td></tr>
+        <tr><td><code>OPENAI_BASE_URL</code></td><td>LLM 接入点（兼容 OpenAI 协议）</td><td><code>https://open.bigmodel.cn/api/paas/v4</code></td></tr>
+        <tr><td><code>OPENAI_MODEL</code></td><td>模型名称</td><td><code>glm-4-flash</code></td></tr>
+        <tr><td><code>BLOB_READ_WRITE_TOKEN</code></td><td>Vercel Blob 存储令牌（不设则回退到 DB 存储）</td><td><code>vercel_blob_...</code></td></tr>
+        <tr><td><code>ATOM_DISABLE_AUTH</code></td><td>设为 <code>1</code> 开启免登录访客模式</td><td><code>1</code></td></tr>
+        <tr><td><code>ATOM_PUBLIC_URL</code></td><td>站点公开访问基础 URL</td><td><code>https://atom.example.com</code></td></tr>
+        <tr><td><code>ATOM_COOKIE_SECURE</code></td><td>Cookie Secure 标志（HTTPS 环境设 1）</td><td><code>1</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tech Stack -->
+  <div class="section">
+    <h2>🛠 技术栈</h2>
+    <table>
+      <thead><tr><th>层级</th><th>技术</th></tr></thead>
+      <tbody>
+        <tr><td>前端</td><td>React 18 · React Router · Vite · 原生 CSS（无 UI 框架依赖）</td></tr>
+        <tr><td>后端</td><td>Python 3.11+ · FastAPI · SQLAlchemy 2.0 · httpx（异步 HTTP）</td></tr>
+        <tr><td>认证</td><td>Argon2 密码哈希 · HttpOnly Cookie Session（30 天滑动续期）</td></tr>
+        <tr><td>数据库</td><td>Neon Postgres（线上）/ SQLite（本地）</td></tr>
+        <tr><td>存储</td><td>Vercel Blob（对象存储）→ Postgres SiteFile（回退）→ 本地文件</td></tr>
+        <tr><td>AI</td><td>OpenAI 兼容协议流式 SSE（GLM-4-Flash 等）</td></tr>
+        <tr><td>部署</td><td>Vercel Serverless（vercel.json 路由重写）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>
