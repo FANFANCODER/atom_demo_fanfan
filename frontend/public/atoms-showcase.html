@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atoms — 把想法变成可销售的产品</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-input: #232326;
+    --accent: #4f7df3;
+    --accent-hover: #3d6ce0;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --text-muted: #6b6b6b;
+    --nav-h: 64px;
+    --card-w: 389px;
+    --grid-w: 1200px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Noto Sans SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ================= 滚动容器 ================= */
+  .scroll-space { height: 260vh; position: relative; }
+
+  .stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 45% at 50% 42%, rgba(79, 125, 243, 0.07) 0%, transparent 70%),
+      radial-gradient(ellipse 80% 60% at 50% 44%, #141414 0%, var(--bg) 65%);
+  }
+
+  /* ================= 导航栏 ================= */
+  .nav {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(20px, 3vw, 40px);
+    z-index: 100;
+  }
+  .nav-left { display: flex; align-items: center; gap: clamp(24px, 3vw, 44px); }
+  .logo {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 17px; font-weight: 700; letter-spacing: .2px; cursor: pointer;
+  }
+  .logo svg { width: 23px; height: 23px; display: block; }
+  .nav-menu { display: flex; gap: clamp(18px, 2.2vw, 30px); font-size: 14px; color: var(--text-secondary); }
+  .nav-menu span { cursor: pointer; transition: color .2s; white-space: nowrap; }
+  .nav-menu span:hover { color: #fff; }
+  .nav-menu .caret { font-size: 10px; vertical-align: 2px; margin-left: 3px; color: var(--text-muted); }
+  .nav-right { display: flex; gap: 10px; }
+  .btn-login {
+    padding: 8px 18px; border-radius: 9px; font-size: 14px;
+    color: var(--text-secondary); cursor: pointer;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.1);
+    transition: all .2s;
+  }
+  .btn-login:hover { color: #fff; background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.18); }
+  .btn-register {
+    padding: 8px 20px; border-radius: 9px; font-size: 14px; font-weight: 500;
+    color: #fff; background: var(--accent); cursor: pointer; border: none;
+    transition: background .2s, transform .2s;
+  }
+  .btn-register:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+  /* ================= Hero 中心文案 ================= */
+  .hero-center {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 10;
+    width: min(660px, 92vw);
+    will-change: transform, opacity;
+  }
+  .trust {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 13px; color: var(--text-secondary);
+    margin-bottom: 26px;
+  }
+  .trust .sep { width: 1px; height: 12px; background: rgba(255,255,255,.18); }
+  .trust .nvidia {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-weight: 800; font-size: 14px; color: #76b900; letter-spacing: .8px;
+  }
+  .hero-title {
+    font-size: clamp(34px, 4.6vw, 58px);
+    font-weight: 700;
+    line-height: 1.16;
+    letter-spacing: -1.2px;
+    margin-bottom: 36px;
+    text-wrap: balance;
+  }
+  .hero-title .accent-line {
+    display: block;
+    background: linear-gradient(92deg, #ffffff 5%, #b8ccff 55%, #7da2ff 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .input-box {
+    display: flex; align-items: center; gap: 10px;
+    max-width: 540px; margin: 0 auto;
+    background: var(--bg-input);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 15px;
+    padding: 8px 8px 8px 22px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05);
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .input-box:focus-within {
+    border-color: rgba(79,125,243,.6);
+    box-shadow: 0 12px 44px rgba(0,0,0,.55), 0 0 0 4px rgba(79,125,243,.14);
+  }
+  .input-box input {
+    flex: 1; min-width: 0;
+    background: none; border: none; outline: none;
+    color: var(--text-primary); font-size: 15px;
+  }
+  .input-box input::placeholder { color: var(--text-muted); }
+  .input-box button {
+    padding: 12px 24px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; gap: 7px;
+    transition: background .2s, transform .2s;
+    white-space: nowrap;
+  }
+  .input-box button:hover { background: var(--accent-hover); transform: translateX(1px); }
+
+  /* ================= 网格标题（终态） ================= */
+  .grid-header {
+    position: absolute;
+    left: 50%; top: clamp(76px, 11vh, 130px);
+    transform: translateX(-50%);
+    width: var(--grid-w);
+    opacity: 0;
+    z-index: 9;
+    will-change: transform, opacity;
+    pointer-events: none;
+  }
+  .grid-header h2 {
+    font-size: clamp(24px, 2.8vw, 38px);
+    font-weight: 700; letter-spacing: -.8px; color: #fff;
+  }
+
+  /* ================= 卡片 ================= */
+  .cards-layer { position: absolute; inset: 0; z-index: 5; }
+  .card {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: var(--card-w);
+    will-change: transform;
+  }
+  .card-inner { animation: floaty 5.6s ease-in-out infinite; animation-delay: var(--fd, 0s); }
+  .card-frame {
+    position: relative;
+    border-radius: 13px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.09);
+    box-shadow: 0 24px 60px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.4);
+    aspect-ratio: 16 / 10;
+    background: #141414;
+    transition: box-shadow .35s, border-color .35s;
+    cursor: pointer;
+    container-type: inline-size;
+  }
+  .card:hover .card-frame {
+    border-color: rgba(255,255,255,.22);
+    box-shadow: 0 36px 90px rgba(0,0,0,.8), 0 6px 20px rgba(0,0,0,.5);
+  }
+  .card-label {
+    margin-top: 13px;
+    font-size: 13px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 7px;
+    transition: color .2s;
+  }
+  .card:hover .card-label { color: #d4d4d4; }
+  .card-label::before {
+    content: "";
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); flex: none;
+    opacity: .8;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(calc(-1 * var(--float-a, 9px))); }
+    50% { transform: translateY(var(--float-a, 9px)); }
+  }
+
+  /* ================= CSS 网站模拟截图 ================= */
+  .mock {
+    position: absolute; inset: 0;
+    transition: transform .5s cubic-bezier(.2,.7,.3,1);
+    text-rendering: optimizeLegibility;
+  }
+  .card:hover .mock { transform: scale(1.05); }
+
+  /* --- 1. 网站展示：天空 + 数据仪表盘 --- */
+  .mock-sky {
+    background:
+      radial-gradient(46cqw 20cqw at 72cqw 10cqw, rgba(255,255,255,.85), transparent 70%),
+      radial-gradient(30cqw 14cqw at 16cqw 24cqw, rgba(255,255,255,.6), transparent 70%),
+      linear-gradient(180deg, #79c2ef 0%, #bfe0f4 55%, #e9f3e6 100%);
+    color: #12395e;
+  }
+  .s-nav { position: absolute; top: 6cqw; left: 6cqw; right: 6cqw; display: flex; justify-content: space-between; align-items: center; }
+  .s-nav b { font-size: 3.6cqw; letter-spacing: .25cqw; }
+  .s-nav span { width: 15cqw; height: 1.1cqw; border-radius: 1cqw; background: rgba(18,57,94,.32); }
+  .s-hero { position: absolute; left: 6cqw; top: 15cqw; }
+  .s-hero h4 { font-size: 6.4cqw; line-height: 1.12; font-weight: 800; letter-spacing: -.15cqw; }
+  .s-hero p { font-size: 2.9cqw; opacity: .75; margin-top: 1.8cqw; }
+  .s-dash {
+    position: absolute; right: 5cqw; bottom: 5cqw; width: 36cqw; height: 21cqw;
+    background: rgba(255,255,255,.94); border-radius: 2.2cqw;
+    box-shadow: 0 1.5cqw 3cqw rgba(20,60,100,.25);
+    display: flex; align-items: flex-end; gap: 1.6cqw; padding: 2.6cqw 2.4cqw 2cqw;
+  }
+  .s-dash i { flex: 1; height: var(--h); border-radius: .5cqw .5cqw 0 0; background: linear-gradient(180deg,#4f7df3,#7aa5f7); }
+  .s-dash i:nth-child(2n) { background: linear-gradient(180deg,#2ebd85,#7fdcb4); }
+  .s-dash em { position: absolute; top: 2cqw; right: 2.4cqw; font-style: normal; font-size: 2.5cqw; font-weight: 800; color: #0fa968; }
+
+  /* --- 2. 电影感网站：Lumen 日落 --- */
+  .mock-lumen {
+    background:
+      radial-gradient(22cqw 22cqw at 50cqw 34cqw, rgba(255,224,150,.95), rgba(255,150,60,.5) 45%, transparent 72%),
+      linear-gradient(180deg, #241537 0%, #5b2a45 40%, #c25a2a 74%, #eda05f 100%);
+    color: #fff;
+  }
+  .l-nav { position: absolute; top: 5.5cqw; left: 6cqw; right: 6cqw; display: flex; align-items: center; gap: 3cqw; font-size: 2.7cqw; letter-spacing: .12cqw; }
+  .l-nav b { font-weight: 700; }
+  .l-nav i { font-style: normal; opacity: .72; }
+  .l-nav i:last-child { margin-left: auto; }
+  .mock-lumen h4 {
+    position: absolute; left: 0; right: 0; top: 13cqw; text-align: center;
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    font-style: italic; font-weight: 600; font-size: 13.5cqw; letter-spacing: .2cqw;
+    text-shadow: 0 1cqw 3cqw rgba(70,25,10,.45);
+  }
+  .mock-lumen p { position: absolute; left: 0; right: 0; top: 29.5cqw; text-align: center; font-size: 2.6cqw; letter-spacing: .5cqw; text-transform: uppercase; opacity: .85; }
+  .l-btn {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 5.5cqw;
+    padding: 1.4cqw 4.2cqw; border: .35cqw solid rgba(255,255,255,.85); border-radius: 5cqw;
+    font-size: 2.6cqw; background: rgba(255,255,255,.14); backdrop-filter: blur(2px);
+  }
+
+  /* --- 3. 创意作品集：DARK ROOM 黑白 --- */
+  .mock-darkroom { background: #101010; color: #f5f5f5; }
+  .d-ph1 { position: absolute; left: 6cqw; top: 6cqw; width: 16cqw; height: 21cqw; border-radius: .8cqw; background: radial-gradient(85% 70% at 50% 28%, #909090, #262626 78%); }
+  .d-ph2 { position: absolute; left: 24cqw; top: 8cqw; width: 15cqw; height: 19cqw; border-radius: .8cqw; background: linear-gradient(160deg, #7c7c7c, #1d1d1d); }
+  .d-ph3 { position: absolute; left: 6cqw; top: 28.5cqw; width: 33cqw; height: 13cqw; border-radius: .8cqw; background: linear-gradient(120deg, #5e5e5e, #171717); opacity: .85; }
+  .mock-darkroom h4 {
+    position: absolute; right: 5.5cqw; top: 5cqw; text-align: right;
+    font-weight: 900; font-size: 10.5cqw; line-height: .95; letter-spacing: -.2cqw;
+  }
+  .mock-darkroom p { position: absolute; right: 6cqw; bottom: 5cqw; font-size: 2.3cqw; letter-spacing: .5cqw; text-transform: uppercase; opacity: .55; }
+
+  /* --- 4. 美食网站：Taste in Motion --- */
+  .mock-food { background: linear-gradient(180deg, #f8ead0 0%, #f2d9a6 100%); color: #4a3418; }
+  .f-top { position: absolute; top: 5cqw; left: 6cqw; right: 6cqw; display: flex; justify-content: space-between; font-size: 2.8cqw; }
+  .f-top b { font-weight: 900; letter-spacing: .35cqw; }
+  .f-top span { opacity: .6; }
+  .mock-food h4 {
+    position: absolute; top: 12cqw; left: 6cqw;
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    font-style: italic; font-weight: 700; font-size: 7.6cqw;
+  }
+  .mock-food p { position: absolute; top: 23cqw; left: 6.2cqw; font-size: 2.7cqw; opacity: .7; letter-spacing: .1cqw; }
+  .f-foods { position: absolute; left: 6cqw; right: 6cqw; bottom: 5cqw; display: flex; gap: 2.6cqw; }
+  .f-foods i { flex: 1; aspect-ratio: 1; border-radius: 2cqw; box-shadow: 0 1cqw 2.6cqw rgba(90,60,20,.3); }
+  .f1 { background: radial-gradient(circle at 35% 30%, #a8d977, #4e8f3a 72%); }
+  .f2 { background: radial-gradient(circle at 50% 35%, #e8a75c, #8a4b1f 76%); }
+  .f3 { background: radial-gradient(circle at 55% 40%, #9c6b4a, #42281a 78%); }
+
+  /* --- 5. 设计节：CF26 --- */
+  .mock-cf26 { background: linear-gradient(115deg, #1a1a1c 55%, #232326 100%); color: #fff; }
+  .mock-cf26::before {
+    content: ""; position: absolute; right: 6cqw; top: 6cqw; bottom: 6cqw; width: .4cqw;
+    background: repeating-linear-gradient(180deg, #ff5227 0 3cqw, transparent 3cqw 5.5cqw);
+  }
+  .c-tag { position: absolute; top: 6cqw; left: 6cqw; font-size: 2.2cqw; letter-spacing: .55cqw; opacity: .6; text-transform: uppercase; }
+  .mock-cf26 h4 { position: absolute; left: 4.6cqw; bottom: 11cqw; font-weight: 900; font-size: 19.5cqw; line-height: 1; letter-spacing: -.9cqw; }
+  .mock-cf26 h4 em { font-style: normal; color: #ff5227; }
+  .mock-cf26 p { position: absolute; left: 6cqw; bottom: 5cqw; font-size: 2.5cqw; opacity: .6; letter-spacing: .3cqw; }
+
+  /* --- 6. 活力美妆店 --- */
+  .mock-beauty { background: #eef25b; color: #141414; }
+  .b1 { position: absolute; top: 0; right: 0; width: 27cqw; height: 19cqw; background: #3d6bf5; }
+  .b2 { position: absolute; top: 19cqw; right: 0; width: 27cqw; height: 7cqw; background: #6ef26e; }
+  .b3 { position: absolute; top: 6cqw; left: 30cqw; width: 9cqw; height: 9cqw; border: .6cqw solid rgba(20,20,20,.75); border-radius: 50%; }
+  .b-pill {
+    position: absolute; top: 6cqw; left: 6cqw;
+    padding: 1cqw 2.6cqw; background: #141414; color: #eef25b;
+    border-radius: 4cqw; font-size: 2.4cqw; font-weight: 700; letter-spacing: .2cqw;
+  }
+  .mock-beauty h4 {
+    position: absolute; left: 5.5cqw; bottom: 12cqw;
+    font-weight: 800; font-size: 5.6cqw; line-height: 1.08; letter-spacing: -.1cqw;
+  }
+  .b-lip { position: absolute; right: 8cqw; bottom: 5cqw; width: 6.4cqw; height: 15.5cqw; }
+  .b-lip i { position: absolute; left: 12%; right: 12%; top: 0; height: 32%; background: #ff4d8f; clip-path: polygon(0 100%, 50% 0, 100% 100%); }
+  .b-lip::after { content: ""; position: absolute; left: 8%; right: 8%; top: 30%; bottom: 0; background: #18181c; border-radius: .8cqw .8cqw 1.2cqw 1.2cqw; }
+
+  /* ================= 滚动提示 ================= */
+  .scroll-hint {
+    position: absolute;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--text-muted);
+    letter-spacing: 2px;
+    z-index: 8;
+    transition: opacity .3s;
+    pointer-events: none;
+  }
+  .scroll-hint svg { animation: hintBob 1.8s ease-in-out infinite; }
+  @keyframes hintBob {
+    0%, 100% { transform: translateY(0); opacity: .5; }
+    50% { transform: translateY(5px); opacity: 1; }
+  }
+
+  /* ================= 页脚 ================= */
+  .footer {
+    border-top: 1px solid rgba(255,255,255,.07);
+    padding: 44px clamp(20px, 4vw, 56px) 40px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .footer .f-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+  .footer .f-logo svg { width: 18px; height: 18px; }
+  .footer .f-copy { font-size: 13px; color: var(--text-muted); }
+  .footer .f-links { display: flex; gap: 22px; font-size: 13px; color: var(--text-secondary); }
+  .footer .f-links span { cursor: pointer; transition: color .2s; }
+  .footer .f-links span:hover { color: #fff; }
+
+  @media (max-width: 760px) {
+    .nav-menu { display: none; }
+    .trust { margin-bottom: 20px; font-size: 12px; }
+    .hero-title { margin-bottom: 28px; letter-spacing: -0.5px; }
+    .input-box { padding: 6px 6px 6px 16px; border-radius: 13px; }
+    .input-box button { padding: 10px 16px; }
+    .card-label { font-size: 11px; margin-top: 9px; }
+    .footer { flex-direction: column; align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-inner, .scroll-hint svg { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scroll-space" id="scrollSpace">
+  <div class="stage" id="stage">
+
+    <!-- 导航栏 -->
+    <nav class="nav">
+      <div class="nav-left">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="2.6" fill="#4f7df3"/>
+            <ellipse cx="12" cy="12" rx="10" ry="4.2" stroke="rgba(255,255,255,.75)" stroke-width="1.1" transform="rotate(-28 12 12)"/>
+            <ellipse cx="12" cy="12" rx="10" ry="4.2" stroke="rgba(255,255,255,.35)" stroke-width="1.1" transform="rotate(32 12 12)"/>
+            <circle cx="3.4" cy="15.6" r="1.5" fill="#76b900"/>
+            <circle cx="20.6" cy="8.4" r="1.5" fill="#ffffff"/>
+          </svg>
+          Atoms
+        </div>
+        <div class="nav-menu">
+          <span>资源<span class="caret">▾</span></span>
+          <span>社区</span>
+          <span>关于</span>
+          <span>定价</span>
+        </div>
+      </div>
+      <div class="nav-right">
+        <button class="btn-login">登录</button>
+        <button class="btn-register">注册</button>
+      </div>
+    </nav>
+
+    <!-- Hero 中心文案（初始态） -->
+    <div class="hero-center" id="heroCenter">
+      <div class="trust">
+        深受这些地区创作者信赖
+        <span class="sep"></span>
+        <span class="nvidia">
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+            <path d="M2.2 0h3.1v1.1C6.6.3 8 .1 9.3 0h4.4l-.7 1.6c-.2.5-.6.8-1.2.8h-1.5c-1.6 0-3 .7-3.9 1.9l-1.4 2H2.9c-1 0-1.7.5-2.1 1.4L0 10.9V2.2C0 1 .9 0 2.2 0Z" fill="#76b900"/>
+            <path d="M6.6 3.9c1.6-1.6 3.7-2.5 6-2.5h2.9l-.7 1.7c-.2.5-.7.8-1.2.8h-1c-1.5 0-2.8.6-3.8 1.6l-1.3 1.3c-.5.5-1.1.8-1.8.8H4.5l2.1-3.7Z" fill="#76b900"/>
+          </svg>
+          NVIDIA
+        </span>
+      </div>
+      <h1 class="hero-title">
+        把想法变成可销售的
+        <span class="accent-line">产品</span>
+      </h1>
+      <div class="input-box">
+        <input type="text" placeholder="告知 Atoms 团队你的需求" id="heroInput">
+        <button>开始 <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h9M7.5 3.5 11 7l-3.5 3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
+
+    <!-- 六张卡片（CSS 网站模拟截图） -->
+    <div class="cards-layer">
+
+      <!-- 0 网站展示：左上 → 网格 r1c1 -->
+      <div class="card" style="--fd: -0.4s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-sky">
+              <div class="s-nav"><b>ACME</b><span></span></div>
+              <div class="s-hero">
+                <h4>The Future of<br>Effortless Growth</h4>
+                <p>从数据到洞察，一站搞定</p>
+              </div>
+              <div class="s-dash">
+                <i style="--h:45%"></i><i style="--h:72%"></i><i style="--h:55%"></i><i style="--h:88%"></i><i style="--h:64%"></i><i style="--h:80%"></i>
+                <em>+128%</em>
+              </div>
+            </div>
+          </div>
+          <div class="card-label">网站展示</div>
+        </div>
+      </div>
+
+      <!-- 1 电影感网站：右上 → 网格 r1c2 -->
+      <div class="card" style="--fd: -2.1s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-lumen">
+              <div class="l-nav"><b>Lumen</b><i>Work</i><i>About</i><i>Contact</i></div>
+              <h4>Lumen</h4>
+              <p>A film by Aria Chen</p>
+              <span class="l-btn">View film</span>
+            </div>
+          </div>
+          <div class="card-label">电影感网站</div>
+        </div>
+      </div>
+
+      <!-- 2 创意作品集：右中 → 网格 r1c3 -->
+      <div class="card" style="--fd: -3.7s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-darkroom">
+              <i class="d-ph1"></i><i class="d-ph2"></i><i class="d-ph3"></i>
+              <h4>DARK<br>ROOM</h4>
+              <p>Photography Portfolio</p>
+            </div>
+          </div>
+          <div class="card-label">创意作品集</div>
+        </div>
+      </div>
+
+      <!-- 3 美食网站：左中 → 网格 r2c1 -->
+      <div class="card" style="--fd: -1.2s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-food">
+              <div class="f-top"><b>TASTE</b><span>Menu · Story · Reserve</span></div>
+              <h4>Taste in Motion</h4>
+              <p>新鲜食材 · 每日灵感</p>
+              <div class="f-foods"><i class="f1"></i><i class="f2"></i><i class="f3"></i></div>
+            </div>
+          </div>
+          <div class="card-label">美食网站</div>
+        </div>
+      </div>
+
+      <!-- 4 设计节网站：左下 → 网格 r2c2 -->
+      <div class="card" style="--fd: -2.9s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-cf26">
+              <span class="c-tag">Design Festival · 2026</span>
+              <h4><i>C</i><em>F</em>26</h4>
+              <p>九月 · 上海西岸 · 三天展览</p>
+            </div>
+          </div>
+          <div class="card-label">设计节网站</div>
+        </div>
+      </div>
+
+      <!-- 5 活力美妆店：右下 → 网格 r2c3 -->
+      <div class="card" style="--fd: -4.6s">
+        <div class="card-inner">
+          <div class="card-frame">
+            <div class="mock mock-beauty">
+              <i class="b1"></i><i class="b2"></i><i class="b3"></i>
+              <span class="b-pill">NEW DROP</span>
+              <h4>soft lips.<br>hard choices.</h4>
+              <div class="b-lip"><i></i></div>
+            </div>
+          </div>
+          <div class="card-label">活力美妆店</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 网格态标题 -->
+    <div class="grid-header" id="gridTitle">
+      <h2>Atoms 能构建什么？</h2>
+    </div>
+
+    <!-- 滚动提示 -->
+    <div class="scroll-hint" id="scrollHint">
+      <span>向下滚动</span>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v9M3.5 7.5 7 11l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+
+  </div>
+</div>
+
+<!-- 页脚 -->
+<footer class="footer">
+  <div class="f-logo">
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="2.6" fill="#4f7df3"/>
+      <ellipse cx="12" cy="12" rx="10" ry="4.2" stroke="rgba(255,255,255,.75)" stroke-width="1.1" transform="rotate(-28 12 12)"/>
+      <ellipse cx="12" cy="12" rx="10" ry="4.2" stroke="rgba(255,255,255,.35)" stroke-width="1.1" transform="rotate(32 12 12)"/>
+    </svg>
+    Atoms
+  </div>
+  <div class="f-links">
+    <span>资源</span><span>社区</span><span>关于</span><span>定价</span>
+  </div>
+  <div class="f-copy">© 2026 Atoms · UI 复刻演示</div>
+</footer>
+
+<script>
+(function () {
+  const space = document.getElementById('scrollSpace');
+  const heroCenter = document.getElementById('heroCenter');
+  const gridTitle = document.getElementById('gridTitle');
+  const scrollHint = document.getElementById('scrollHint');
+  const cardEls = Array.from(document.querySelectorAll('.card'));
+
+  // 初始错落态（桌面）：位置为视口比例（舞台中心为原点）+ 倾斜角度
+  const CONF_D = [
+    { x: -0.36, y: -0.30, r: -6 },  // 网站展示   左上 → r1c1
+    { x:  0.36, y: -0.33, r: 4  },  // 电影感网站 右上 → r1c2
+    { x:  0.36, y: -0.02, r: 7  },  // 创意作品集 右中 → r1c3
+    { x: -0.36, y: -0.02, r: -12},  // 美食网站   左中 → r2c1
+    { x: -0.36, y:  0.31, r: -9 },  // 设计节网站 左下 → r2c2
+    { x:  0.36, y:  0.31, r: 10 },  // 活力美妆店 右下 → r2c3
+  ];
+  // 初始错落态（移动端）：卡片偏小，上下分布，避开中心文案
+  const CONF_M = [
+    { x: -0.30, y: -0.36, r: 8  },
+    { x:  0.28, y: -0.38, r: -5 },
+    { x:  0.30, y: -0.33, r: 5  },
+    { x: -0.30, y:  0.36, r: -12},
+    { x: -0.28, y:  0.38, r: 15 },
+    { x:  0.30, y:  0.33, r: -8 },
+  ];
+  // 每张卡片的动画延迟（按目标列错开，产生先后节奏）
+  const DELAY = [0, 0.06, 0.10, 0.03, 0.08, 0.12];
+
+  let vw = 0, vh = 0, cardW = 0, targets = [], CONF = CONF_D, s0 = 1.045;
+
+  function computeLayout() {
+    vw = innerWidth; vh = innerHeight;
+    const twoCol = vw < 760;
+    CONF = twoCol ? CONF_M : CONF_D;
+    s0 = twoCol ? 0.8 : 1.045;
+    let gap;
+    if (twoCol) {
+      gap = 12;
+      cardW = (vw - 48 - gap) / 2;
+    } else {
+      gap = Math.max(20, vw * 0.03);
+      cardW = Math.min(430, Math.max(270, vw * 0.27));
+    }
+    const spacing = cardW + gap;
+    targets = [];
+    if (twoCol) {
+      const rows = [-0.24, 0.03, 0.30];
+      for (let i = 0; i < 6; i++) {
+        targets.push({ x: (i % 2 - 0.5) * spacing, y: rows[Math.floor(i / 2)] * vh });
+      }
+    } else {
+      const rows = [-0.09, 0.28];
+      for (let i = 0; i < 6; i++) {
+        targets.push({ x: (i % 3 - 1) * spacing, y: rows[Math.floor(i / 3)] * vh });
+      }
+    }
+    const gridW = twoCol ? cardW * 2 + gap : cardW * 3 + gap * 2;
+    const root = document.documentElement.style;
+    root.setProperty('--card-w', cardW + 'px');
+    root.setProperty('--grid-w', gridW + 'px');
+  }
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeInOut = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  function update() {
+    const rect = space.getBoundingClientRect();
+    const total = rect.height - vh;
+    const raw = clamp(-rect.top / total, 0, 1);
+
+    // Hero 文案：前 40% 完成淡出上移
+    const hp = easeInOut(clamp(raw / 0.4, 0, 1));
+    heroCenter.style.opacity = 1 - hp;
+    heroCenter.style.transform =
+      'translate(-50%, calc(-50% - ' + (hp * 90).toFixed(1) + 'px)) scale(' + (1 - hp * 0.1).toFixed(3) + ')';
+    heroCenter.style.pointerEvents = hp > 0.5 ? 'none' : '';
+
+    // 滚动提示淡出
+    scrollHint.style.opacity = 1 - clamp(raw / 0.12, 0, 1);
+
+    // 网格标题：55%→85% 淡入
+    const tp = easeInOut(clamp((raw - 0.55) / 0.3, 0, 1));
+    gridTitle.style.opacity = tp;
+    gridTitle.style.transform = 'translateX(-50%) translateY(' + ((1 - tp) * 24).toFixed(1) + 'px)';
+
+    // 卡片：错落 → 规则网格
+    for (let i = 0; i < 6; i++) {
+      const c = CONF[i];
+      const d = DELAY[i];
+      const cp = easeInOut(clamp((raw - d) / (0.88 - d), 0, 1));
+
+      const x = lerp(c.x * vw, targets[i].x, cp);
+      const y = lerp(c.y * vh, targets[i].y, cp);
+      const r = lerp(c.r, 0, cp);
+      const s = lerp(s0, 1, cp);
+
+      cardEls[i].style.transform =
+        'translate(calc(-50% + ' + x.toFixed(1) + 'px), calc(-50% + ' + y.toFixed(1) + 'px))' +
+        ' rotate(' + r.toFixed(2) + 'deg) scale(' + s.toFixed(3) + ')';
+      // 悬浮动画幅度随进度衰减为 0
+      cardEls[i].style.setProperty('--float-a', (9 * (1 - cp)).toFixed(2) + 'px');
+    }
+  }
+
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { update(); ticking = false; });
+  }
+
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', () => { computeLayout(); update(); });
+
+  computeLayout();
+  update();
+})();
+</script>
+</body>
+</html>
