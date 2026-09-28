@@ -104,7 +104,7 @@ def _try_fix_llm_json(s: str) -> str:
 _STATIC_APP_KEY = re.compile(r"""\b([A-Za-z_$][\w$]*)\s*=\s*(['\"])app:(?!\2)(.+?)\2""")
 
 _LS_INLINE_KEY = re.compile(
-    r"""(localStorage\.(?:get|set|remove)Item\(\s*)(['\"])([^'\"]+)\2"""
+    r"""(localStorage\.(?:get|set|remove)Item\(\s*)(['\")])([^'\"]+)\2"""
 )
 
 
@@ -131,7 +131,7 @@ def _normalize_storage_key(files: dict) -> dict:
             continue
         if not (path.endswith((".js", ".html")) or "<script" in content):
             continue
-        fixed = _STATIC_APP_KEY.sub(r"\1='app:'+location.pathname", content)
+        fixed = _STATIC_APP_KEY.sub(r"\1='app:'+location.pathname+':\3'", content)
         fixed = _LS_INLINE_KEY.sub(_inline_key_sub, fixed)
         if fixed != content:
             files[path] = fixed
