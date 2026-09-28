@@ -35,6 +35,7 @@ Rules:
 - CRITICAL — data persistence: if the app manages user-entered data (tasks, notes, list items, counters), include EXACTLY this storage pattern (copy verbatim, replacing only the variable name and default value):
   const KEY='app:'+location.pathname;let tasks=[];try{tasks=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){};
   Then call localStorage.setItem(KEY,JSON.stringify(tasks)) after EVERY mutation (add/edit/delete/complete). Never keep user data only in JS variables — data must survive page refresh.
+- CRITICAL — initial render: immediately after the storage-load line, call your render/update function once at startup (e.g. render();) so saved items are visible on page load without any user interaction. Merely defining the render function is NOT enough — it must be invoked on startup.
 - No placeholders like lorem ipsum — write real copy fitting the request.
 - No external CDN dependencies; inline SVGs/icons instead.
 - NEVER use <img src=\"...\"> with external URLs — they will break. Use CSS gradients, inline SVG, or colored divs for any visual/image placeholders.
@@ -136,6 +137,132 @@ def _normalize_storage_key(files: dict) -> dict:
         if fixed != content:
             files[path] = fixed
             print(f"[agent] normalized static storage key in {path}")
+    return files
+
+
+# ---------- Boot-render normalization ----------
+# The LLM frequently defines render functions but never invokes them at
+# startup, so data loaded from localStorage stays invisible until the user
+# interacts with the page (e.g. clicks "add"). Detect that pattern and
+# append a guarded boot-render call.
+
+_RENDER_PREFIXES = ("render", "update", "display", "draw", "refresh", "paint", "show", "list")
+_RENDER_EXCLUDE = re.compile(r"incomplete|active|pending|completed|undone", re.I)
+
+_BOOT_SNIPPET = (
+    ";(function(){function _boot(){try{%s()}catch(e){}}"
+    "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_boot)}"
+    "else{_boot()}})();"
+)
+
+
+def _strip_js_strings(code: str) -> str:
+    """Blank out string/template literals and comments so brace matching is safe."""
+    code = re.sub(r"'(?:\\.|[^'\\])*'", "''", code)
+    code = re.sub(r'"(?:\\.|[^"\\])*"', '""', code)
+    code = re.sub(r"`(?:\\.|[^`\\])*`", "``", code)
+    code = re.sub(r"/\*.*?\*/", " ", code, flags=re.S)
+    code = re.sub(r"//[^\n]*", " ", code)
+    return code
+
+
+def _match_brace(js: str, open_idx: int) -> int:
+    """Given the index of '{', return the index just past its matching '}' (-1 if none)."""
+    depth = 0
+    for i in range(open_idx, len(js)):
+        c = js[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return -1
+
+
+def _extract_functions(js: str):
+    """Return [(name, start, end)] of function declarations / arrow consts
+    with brace-matched bodies (strings already stripped)."""
+    funcs = []
+    for m in re.finditer(r"function\s+([A-Za-z_$][\w$]*)\s*\([^(){}]*\)\s*\{", js):
+        end = _match_brace(js, m.end() - 1)
+        if end > 0:
+            funcs.append((m.group(1), m.start(), end))
+    for m in re.finditer(r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^(){}]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{", js):
+        end = _match_brace(js, m.end() - 1)
+        if end > 0:
+            funcs.append((m.group(1), m.start(), end))
+    return funcs
+
+
+def _outer_functions(funcs):
+    """Keep only outermost (non-nested) function spans, in source order."""
+    outer = []
+    last_end = -1
+    for name, s, e in sorted(funcs, key=lambda f: f[1]):
+        if s >= last_end:
+            outer.append((name, s, e))
+            last_end = e
+    return outer
+
+
+def _ensure_boot_render(files: dict) -> dict:
+    """If a generated app defines render-ish functions but never calls one at
+    startup, append a guarded boot-render call so saved data shows on load."""
+    for path, content in list(files.items()):
+        if not isinstance(content, str) or not content:
+            continue
+        script_blocks = None
+        if path.endswith(".js"):
+            corpus = content
+        elif path.endswith(".html") and "<script" in content:
+            script_blocks = list(re.finditer(r"<script[^>]*>(.*?)</script>", content, re.S))
+            corpus = "\n".join(b.group(1) for b in script_blocks)
+        else:
+            continue
+        stripped = _strip_js_strings(corpus)
+        funcs = _extract_functions(stripped)
+        if not funcs:
+            continue
+        # App already wires its own boot handler — don't risk a double render.
+        # (Check the RAW corpus: the listener name lives inside a string
+        # literal, which _strip_js_strings blanks out.)
+        if re.search(r"DOMContentLoaded|window\.onload|document\.onreadystatechange", corpus):
+            continue
+        outer = _outer_functions(funcs)
+        top_code = stripped
+        for name, s, e in reversed(outer):
+            # Use padded " FN " so the placeholder cannot fuse with the
+            # following identifier and break \b word-boundary checks.
+            top_code = top_code[:s] + " FN " + top_code[e:]
+        cands = [n for n, _, _ in outer
+                 if n.lower().startswith(_RENDER_PREFIXES) and n != "_boot"]
+        if not cands:
+            continue
+        if any(re.search(r"\b" + re.escape(n) + r"\s*\(", top_code) for n in cands):
+            continue  # already renders at load time
+        def _prio(n):
+            low = n.lower()
+            if _RENDER_EXCLUDE.search(n):
+                return (2, 9)
+            for i, p in enumerate(("render", "update", "display", "draw", "refresh", "paint")):
+                if low.startswith(p):
+                    return (0, i)
+            if low.startswith("show"):
+                return (0 if "all" in low else 1, 7)
+            return (1, 8)  # list*
+        best = min(cands, key=_prio)
+        if _prio(best)[0] >= 2:
+            continue  # only filter-specific functions — calling one would be wrong
+        snippet = _BOOT_SNIPPET % best
+        if script_blocks is not None:
+            close = content.rfind("</script>")
+            if close == -1:
+                continue
+            files[path] = content[:close] + snippet + content[close:]
+        else:
+            files[path] = content + snippet
+        print(f"[agent] added boot render call to {path} ({best})")
     return files
 
 
@@ -250,6 +377,7 @@ async def generate_with_llm_stream(prompt: str):
 
     if "files" in data and "index.html" in data["files"]:
         _normalize_storage_key(data["files"])
+        _ensure_boot_render(data["files"])
         yield {"type": "done", "data": data}
         return
 
